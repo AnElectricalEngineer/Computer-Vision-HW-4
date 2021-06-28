@@ -15,15 +15,17 @@ import numpy.ma as ma
 
 def projectPoints(im1, im2, N):
     p1, p2 = getPoints(im1, im2, N)
-    H = computeH(p1, p2)
+    H2to1 = computeH(p1, p2)
+
     fig1.suptitle('Choose an arbitrary point from the left image')
     plt.draw()
-    arbitraryPoint = np.asarray(fig1.ginput(n=1, timeout=-1)[0])
-    axes1[0].scatter(arbitraryPoint[0], arbitraryPoint[1], marker='x',
+    arbitrary_point = np.asarray(fig1.ginput(n=1, timeout=-1)[0])
+    axes1[0].scatter(arbitrary_point[0], arbitrary_point[1], marker='x',
                      color='green')
     plt.draw()
-    arbitraryPoint = np.array([arbitraryPoint[0], arbitraryPoint[1], 1])
-    projectedPoint = np.matmul(H, arbitraryPoint)
+    arbitrary_point = np.array([arbitrary_point[0], arbitrary_point[1], 1])
+    H1to2 = np.linalg.inv(H2to1)
+    projectedPoint = np.matmul(H1to2, arbitrary_point)
     projectedPoint = projectedPoint / projectedPoint[-1]
     axes1[1].scatter(projectedPoint[0], projectedPoint[1], marker='o',
                      color='green')
@@ -34,11 +36,58 @@ def projectPoints(im1, im2, N):
                 "Example.png")
 
 
+# Computes the size of the bounding box needed to warp an image im1 (left
+# image) and stitch it to im2 (unwarped image - right side)
+def computeOutSize(im1, im2, H2to1):
+    H1to2 = np.linalg.inv(H2to1)
+
+    # height and width of image to be warped
+    height_im1, width_im1 = im1.shape[:2]
+    height_im2, width_im2 = im2.shape[:2]
+
+    old_upper_left_corner = np.float32([0, 0, 1])
+    old_upper_right_corner = np.float32([width_im1, 0, 1])
+    old_lower_left_corner = np.float32([0, height_im1, 1])
+    old_lower_right_corner = np.float32([width_im1, height_im1, 1])
+
+    # The corners of the image im1 before warping
+    old_corners = np.float32([old_upper_left_corner, old_upper_right_corner,
+                              old_lower_left_corner,
+                              old_lower_right_corner]).T
+
+    # The corners of the image im1 after warping (after H1to2 is applied)
+    new_corners = H1to2 @ old_corners
+
+    # Adjust for scale
+    new_corners[:, 0] /= new_corners[2, 0]
+    new_corners[:, 1] /= new_corners[2, 1]
+    new_corners[:, 2] /= new_corners[2, 2]
+    new_corners[:, 3] /= new_corners[2, 3]
+
+    # Calculate necessary size of new warped image
+    x_min = np.min((np.floor(new_corners[0, :])))
+    x_min = min(x_min, 0)
+    y_min = np.min((np.floor(new_corners[1, :])), 0)
+    y_min = min(y_min, 0)
+
+    x_max = np.max((np.ceil(new_corners[0, :])))
+    x_max = max(x_max, width_im2)
+    y_max = np.max((np.ceil(new_corners[1, :])))
+    y_max = max(y_max, height_im2)
+
+    # Calculate amount of translation necessary
+    x_right_amount = int(x_min)
+    y_down_amount = int(y_min)
+
+    warped_im_width = int(x_max - x_min)
+    warped_im_height = int(y_max - y_min)
+
+    return (warped_im_height, warped_im_width, 3), y_down_amount, x_right_amount
+
+
 # Extra functions end
 
 # HW functions:
-fig1, axes1 = plt.subplots(1, 2)
-
 
 def getPoints(im1, im2, N):
     axes1[0].imshow(im1)
@@ -65,6 +114,11 @@ def getPoints(im1, im2, N):
     return p1.T, p2.T
 
 
+################################################################################
+
+# Gets a set of matching points between two images - p1, p2, and calculates
+# the transformation between them.
+# continue later
 def computeH(p1, p2):
     assert (p1.shape[1] == p2.shape[1])
     assert (p1.shape[0] == 2)
@@ -72,20 +126,41 @@ def computeH(p1, p2):
     N = p1.shape[1]
     A = np.zeros((2 * N, 9))
 
-    p1 = np.vstack([p1, np.ones(N)])
-    A[range(0, 2 * N, 2), 0:3] = p1.T
-    A[range(1, 2 * N, 2), 3:6] = p1.T
-    A[range(0, 2 * N, 2), 6:8] = -p1[0:2].T * np.array([p2[0], p2[0]]).T
-    A[range(1, 2 * N, 2), 6:8] = -p1[0:2].T * np.array([p2[1], p2[1]]).T
-    A[range(0, 2 * N, 2), 8] = -p2[0].T
-    A[range(1, 2 * N, 2), 8] = -p2[1].T
+    x_i = p2[0, :].T  # column vector of x_is (Nx1)
+    y_i = p2[1, :].T  # column vector of y_is (Nx1)
+    u_i = p1[0, :].T  # column vector of u_is (Nx1)
+    v_i = p1[1, :].T  # column vector of v_is (Nx1)
 
-    _lambda, V = np.linalg.eig(np.matmul(A.T, A))
-    indexOfSmallestLambda = np.abs(_lambda).argmin()
-    H2to1 = V[:, indexOfSmallestLambda].reshape(3, 3)
+    # Build A column by column
+    A[::2, 0] = x_i  # put x_is in first column of all even rows of A
+    A[::2, 1] = y_i  # put y_is in second column of all even rows of A
+    A[::2, 2] = np.ones(N)  # put 1s in third column of all even rows of A
+
+    A[1::2, 3] = x_i  # put x_is in fourth column of all odd rows of A
+    A[1::2, 4] = y_i  # put y_is in fifth column of all odd rows of A
+    A[1::2, 5] = np.ones(N)  # put 1s in sixth column of all odd rows of A
+
+    A[::2,
+    6] = -x_i * u_i  # put -x_i*u_i in the seventh column of all even rows of A
+    A[1::2,
+    6] = -x_i * v_i  # put -x_i*v_i in the seventh column of all odd rows of A
+
+    A[::2,
+    7] = -y_i * u_i  # put -y_i*u_i in the eighth column of all even rows of A
+    A[1::2,
+    7] = -y_i * v_i  # put -y_i*v_i in the eighth column of all odd rows of A
+
+    A[::2, 8] = -u_i  # put -u_i in the 9th column of all the even rows of A
+    A[1::2, 8] = -v_i  # put -v_i in the 9th column of all the odd rows of A
+
+    _lambda, V = np.linalg.eig(A.T @ A)
+    indexOfSmallestLambda = np.argmin(_lambda)
+    H2to1 = V[:, indexOfSmallestLambda].reshape((3, 3))
 
     return H2to1
 
+
+################################################################################
 
 def warpH(im1, H, out_size, interpolation_type='linear'):
     # Split im1 into channels
@@ -108,8 +183,10 @@ def warpH(im1, H, out_size, interpolation_type='linear'):
     upper_right_corner = H @ np.array([out_size[1], 0, 1]).T
     upper_right_corner = upper_right_corner / upper_right_corner[2]
 
-    x_grid = np.linspace(upper_left_corner[0], upper_right_corner[0], im1.shape[1])
-    y_grid = np.linspace(upper_left_corner[1], bottom_left_corner[1], im1.shape[0])
+    x_grid = np.linspace(upper_left_corner[0], upper_right_corner[0],
+                         im1.shape[1])
+    y_grid = np.linspace(upper_left_corner[1], bottom_left_corner[1],
+                         im1.shape[0])
 
     # Interpolate by channel
     f_red = interpolate.interp2d(x_grid, y_grid, red_channel_im1,
@@ -144,7 +221,6 @@ def warpH(im1, H, out_size, interpolation_type='linear'):
 
 
 def imageStitching(img1, warp_img2):
-
     img1_mask = np.where(img1 != [0, 0, 0])
     print(img1_mask)
     panoImg = img1
@@ -166,6 +242,18 @@ def getPoints_SIFT(im1, im2):
     return p1, p2
 
 
+################################################################################
+# Question 1.2
+def Q1Two():
+    projectPoints(im1, im2, 6)
+
+
+# TODO test func - delete at end
+def outSizeTestFunc():
+    return computeOutSize(im1, im2, H2to1)
+
+
+################################################################################
 if __name__ == '__main__':
     print('my_homography')
     im1 = cv2.imread('data/incline_L.png')
@@ -173,7 +261,9 @@ if __name__ == '__main__':
     im2 = cv2.imread('data/incline_R.png')
     im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
 
-    # p1, p2 = getPoints(im1, im2, 6)
+    # fig1, axes1 = plt.subplots(1, 2)
+    # Q1Two()
+
     p1 = np.array([[454.5436828, 511.94919355, 602.95793011, 623.95994624,
                     640.76155914, 612.75887097], [110.43200202, 111.83213642,
                                                   484.26788911, 481.4676203,
@@ -182,15 +272,8 @@ if __name__ == '__main__':
                     335.14623656, 294.24516129],
                    [151.48032796, 154.62656452, 536.89430645, 535.32118817,
                     532.17495161, 244.29430645]])
-    H = computeH(p1, p2)
 
-    testWarped1 = warpH(im1, np.linalg.inv(H), im2.shape,
-                          interpolation_type='linear')
-    testWarped2 = warpH(im1, np.linalg.inv(H), im2.shape,
-                          interpolation_type='cubic')
+    H2to1 = computeH(p1, p2)
 
-    fig, axes = plt.subplots(1, 2)
-    axes[0].imshow(testWarped1)
-    axes[1].imshow(testWarped2)
-
-    # projectPoints(im1, im2, 6)
+    out_size, y_offset, x_offset = outSizeTestFunc()
+    print(f"{out_size, y_offset, x_offset}")
