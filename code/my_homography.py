@@ -9,6 +9,8 @@ import numpy.ma as ma
 
 # Add imports if needed:
 
+import random
+
 # end imports
 
 # Add extra functions here:
@@ -137,21 +139,33 @@ def alignImage(im1, im2, warpedIm1, H2to1, align_warped_im=True):
         warped_im1_mask = np.where(warpedIm1 != [0, 0, 0])
         warped_im1_aligned[warped_im1_mask] = warpedIm1[warped_im1_mask]
         return warped_im1_aligned.astype(np.uint8)
-    # else:
-    #     # calculate how much to move down - y axis
-    #     upper_left_corner = H1to2 @ np.array([0, 0, 1]).T
-    #     upper_left_corner = upper_left_corner / upper_left_corner[2]
-    #     y = abs(int(np.ceil(upper_left_corner[1])))
-    #
-    #     # calculate how much to move right - x axis
-    #     x = out_size[1] - im2.shape[1]
-    #
-    #     im2_aligned = np.zeros(out_size, dtype='uint8')
-    #     im2_mask = np.where(im2 != [0, 0, 0])
-    #     #         im2_aligned[im2_mask[0] + y, im2_mask[1] + x, im2_mask[2]] = im2[im2_mask]
-    #     im2_aligned[im2_mask[0] - y2, im2_mask[1] - x2, im2_mask[2]] = im2[
-    #         im2_mask]
-    #     return im2_aligned
+    else:
+        im2_aligned = np.zeros(total_out_size)
+        im2_mask = np.where(im2 != [0, 0, 0])
+        im2_aligned[im2_mask[0] - y_down_amount, im2_mask[1] - x_right_amount,
+                    im2_mask[2]] = im2[im2_mask]
+        return im2_aligned.astype(np.uint8)
+
+
+# Here we took 10 best features...make sure correct
+def createBigPanorama(images, mode='SIFT'):
+    current_result = images[0]
+    if mode == 'SIFT':
+        for i, image in enumerate(images[1:]):
+            p1_SIFT, p2_SIFT = getPoints_SIFT(current_result, image)
+            H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+            out_size = computeOutSize(current_result, H_SIFT_2to1)
+            warped_im1_SIFT = warpH(current_result, H_SIFT_2to1, out_size,
+                                    interpolation_type='linear')
+            warped_im1_SIFT_aligned = alignImage(current_result, image,
+                                                 warped_im1_SIFT, H_SIFT_2to1,
+                                                 True)
+            image_aligned = alignImage(current_result, image, warped_im1_SIFT,
+                                       H_SIFT_2to1, False)
+            current_result = imageStitching(image_aligned,
+                                            warped_im1_SIFT_aligned)
+        return current_result
+
 
 
 # Extra functions end
@@ -285,25 +299,63 @@ def warpH(im1, H2to1, out_size, interpolation_type='linear'):
     return warp_im1
 
 
-def imageStitching(img1, warp_img2):
-    img1_mask = np.where(img1 != [0, 0, 0])
-    print(img1_mask)
-    panoImg = img1
-    panoImg[img1_mask] = warp_img2
+def imageStitching(im1, im2):
+    im1_mask = np.where(im1 == [0, 0, 0])
+    panoImg = im1
+    panoImg[im1_mask] = im2[im1_mask]
     return panoImg
 
 
-def ransacH(matches, locs1, locs2, nIter, tol):
-    """
-    Your code here
-    """
+def ransacH(p1, p2, nIter=250, tol=3):
+    num_points = p1.shape[1]
+    p2_homogeneous = np.vstack((p2, np.ones((1, num_points))))
+    max_num_inliers = 0
+    indicies_of_inliers = np.zeros(num_points)
+
+    for i in range(nIter):
+        # choose 4 random points
+        num_points = p1.shape[1]
+        random_indexes = random.sample(range(0, num_points), 4)
+        chosen_points_1 = p1[:, random_indexes]
+        chosen_points_2 = p2[:, random_indexes]
+        H2to1 = computeH(chosen_points_1, chosen_points_2)
+
+        projected_points = H2to1 @ p2_homogeneous
+        projected_points[:, :] /= projected_points[2, :]
+        norms = np.sum((projected_points[:2] - p1)**2, axis=0)
+        num_inliers = np.count_nonzero(norms < tol**2)
+        if(num_inliers >= max_num_inliers):
+            max_num_inliers = num_inliers
+            indicies_of_inliers = np.array(np.where(norms < tol**2))
+
+    bestH = computeH(np.squeeze(p1[:, indicies_of_inliers]), np.squeeze(p2[:,
+                                                      indicies_of_inliers]))
     return bestH
 
 
 def getPoints_SIFT(im1, im2):
-    """
-    Your code here
-    """
+    # Initiate the SIFT detector
+    sift = cv2.xfeatures2d.SIFT_create()
+
+    # Find the keypoints and descriptors
+    kp_im1, desc_im1 = sift.detectAndCompute(im1, None)
+    kp_im2, desc_im2 = sift.detectAndCompute(im2, None)
+
+    # Match keypoints using L2 norm - documentation said that it is good for SIFT
+    # Use crossCheck=true which ensures that the matcher returns only those matches
+    # with value (i,j) such that i-th descriptor in set A has j-th descriptor in
+    # set B as the best match and vice-versa.
+    brute_force = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+
+    # Get best matches of the two images
+    matches = brute_force.match(desc_im1, desc_im2)
+
+    # Sort them in the order of their distance.
+    matches = sorted(matches, key=lambda x: x.distance)
+
+    p1 = np.array([kp_im1[m.queryIdx].pt for m in matches]).T
+    p2 = np.array([kp_im2[m.trainIdx].pt for m in matches]).T
+
     return p1, p2
 
 
@@ -349,13 +401,62 @@ if __name__ == '__main__':
     out_size = outSizeTestFunc()
     print(f"{out_size}")
 
-    warped_im1 = Q1Three()
+    # warped_im1 = Q1Three()
+    # np.save('./../temp/warped_im1', warped_im1)
     # plt.imshow(warped_im1)
 
+    warped_im1 = np.load('./../temp/warped_im1.npy')
     out_size_for_alignment1 = computeOutSizeForAxisAlignment(im1, im2,
                                                              H2to1)
     print(out_size_for_alignment1)
 
     warped_im1_aligned = alignImage(im1, im2, warped_im1, H2to1, True)
-    plt.imshow(warped_im1_aligned)
+    # plt.imshow(warped_im1_aligned)
+
+    im2_aligned = alignImage(im1, im2, warped_im1, H2to1, False)
+    #plt.imshow(im2_aligned)
+
+    stitched_image = imageStitching(im2_aligned, warped_im1_aligned)
+    #plt.imshow(stitched_image)
+
+    p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
+    H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+    out_size_im_1_sift_warped = computeOutSize(im1, H_SIFT_2to1)
+    # warped_im1_SIFT = warpH(im1, H_SIFT_2to1, out_size_im_1_sift_warped,
+    #                         interpolation_type='linear')
+    # np.save('./../temp/warped_im1_SIFT', warped_im1_SIFT)
+
+    warped_im1_SIFT = np.load('./../temp/warped_im1_SIFT.npy')
+    # plt.imshow(warped_im1_SIFT)
+
+
+    warped_im1_SIFT_aligned = alignImage(im1, im2, warped_im1_SIFT,
+                                         H_SIFT_2to1, True)
+    im2_aligned = alignImage(im1, im2, warped_im1_SIFT, H_SIFT_2to1, False)
+
+    # plt.imshow(warped_im1_SIFT_aligned)
+    stitched_image_SIFT = imageStitching(im2_aligned, warped_im1_SIFT_aligned)
+    # plt.imshow(stitched_image_SIFT)
+
+    # beach_images = [cv2.imread('./data/beach1.jpg'),
+    #                 cv2.imread('./data/beach2.jpg'),
+    #                 cv2.imread('./data/beach3.jpg'),
+    #                 cv2.imread('./data/beach4.jpg')]
+    #
+    # scale_percent = 40  # percent of original size
+    # width = int(beach_images[0].shape[1] * scale_percent / 100)
+    # height = int(beach_images[0].shape[0] * scale_percent / 100)
+    # dim = (width, height)
+    #
+    # beach_images = [cv2.resize(img, dim) for img in beach_images]
+    # beach_images = [cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) for img in
+    #                 beach_images]
+    #
+    # SIFT_result = createBigPanorama(beach_images)
+    # SIFT_result = cv2.cvtColor(SIFT_result, cv2.COLOR_BGR2RGB)
+    # plt.imshow(SIFT_result)
+
+    H2to1_Ransac_SIFT = ransacH(p1_SIFT, p1_SIFT)
+    print(H2to1_Ransac_SIFT)
+
     print("end")
