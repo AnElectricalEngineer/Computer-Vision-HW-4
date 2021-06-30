@@ -36,9 +36,50 @@ def projectPoints(im1, im2, N):
                 "Example.png")
 
 
+# Computes the size of an image im1 after a warp H1to2 is applied to it
+def computeOutSize(im1, H2to1):
+    H1to2 = np.linalg.inv(H2to1)
+
+    # height and width of image to be warped
+    height_im1, width_im1 = im1.shape[:2]
+
+    old_upper_left_corner = np.float32([0, 0, 1])
+    old_upper_right_corner = np.float32([width_im1, 0, 1])
+    old_lower_left_corner = np.float32([0, height_im1, 1])
+    old_lower_right_corner = np.float32([width_im1, height_im1, 1])
+
+    # The corners of the image im1 before warping
+    old_corners = np.float32([old_upper_left_corner, old_upper_right_corner,
+                              old_lower_left_corner,
+                              old_lower_right_corner]).T
+
+    # The corners of the image im1 after warping (after H1to2 is applied)
+    new_corners = H1to2 @ old_corners
+    # Adjust for scale
+    new_corners[:, 0] /= new_corners[2, 0]
+    new_corners[:, 1] /= new_corners[2, 1]
+    new_corners[:, 2] /= new_corners[2, 2]
+    new_corners[:, 3] /= new_corners[2, 3]
+
+    # Calculate necessary size of new warped image
+
+    # Find min X, Y coordinates
+    x_min = np.min((np.floor(new_corners[0, :])))
+    y_min = np.min((np.floor(new_corners[1, :])))
+
+    # Find max X, Y coordinates
+    x_max = np.max((np.ceil(new_corners[0, :])))
+    y_max = np.max((np.ceil(new_corners[1, :])))
+
+    new_width = int(x_max - x_min)
+    new_height = int(y_max - y_min)
+    out_size = (new_height, new_width, 3)
+    return out_size
+
+
 # Computes the size of the bounding box needed to warp an image im1 (left
 # image) and stitch it to im2 (unwarped image - right side)
-def computeOutSize(im1, im2, H2to1):
+def computeOutSizeForAxisAlignment(im1, im2, H2to1):
     H1to2 = np.linalg.inv(H2to1)
 
     # height and width of image to be warped
@@ -67,7 +108,7 @@ def computeOutSize(im1, im2, H2to1):
     # Calculate necessary size of new warped image
     x_min = np.min((np.floor(new_corners[0, :])))
     x_min = min(x_min, 0)
-    y_min = np.min((np.floor(new_corners[1, :])), 0)
+    y_min = np.min((np.floor(new_corners[1, :])))
     y_min = min(y_min, 0)
 
     x_max = np.max((np.ceil(new_corners[0, :])))
@@ -83,6 +124,34 @@ def computeOutSize(im1, im2, H2to1):
     warped_im_height = int(y_max - y_min)
 
     return (warped_im_height, warped_im_width, 3), y_down_amount, x_right_amount
+
+
+def alignImage(im1, im2, warpedIm1, H2to1, align_warped_im=True):
+    H1to2 = np.linalg.inv(H2to1)
+    total_out_size, y_down_amount, x_right_amount = \
+        computeOutSizeForAxisAlignment(im1, im2, H2to1)
+    # TODO maybe put warped_im1 here instead of im1
+
+    if align_warped_im == True:
+        warped_im1_aligned = np.zeros(total_out_size)
+        warped_im1_mask = np.where(warpedIm1 != [0, 0, 0])
+        warped_im1_aligned[warped_im1_mask] = warpedIm1[warped_im1_mask]
+        return warped_im1_aligned.astype(np.uint8)
+    # else:
+    #     # calculate how much to move down - y axis
+    #     upper_left_corner = H1to2 @ np.array([0, 0, 1]).T
+    #     upper_left_corner = upper_left_corner / upper_left_corner[2]
+    #     y = abs(int(np.ceil(upper_left_corner[1])))
+    #
+    #     # calculate how much to move right - x axis
+    #     x = out_size[1] - im2.shape[1]
+    #
+    #     im2_aligned = np.zeros(out_size, dtype='uint8')
+    #     im2_mask = np.where(im2 != [0, 0, 0])
+    #     #         im2_aligned[im2_mask[0] + y, im2_mask[1] + x, im2_mask[2]] = im2[im2_mask]
+    #     im2_aligned[im2_mask[0] - y2, im2_mask[1] - x2, im2_mask[2]] = im2[
+    #         im2_mask]
+    #     return im2_aligned
 
 
 # Extra functions end
@@ -162,26 +231,26 @@ def computeH(p1, p2):
 
 ################################################################################
 
-def warpH(im1, H, out_size, interpolation_type='linear'):
+def warpH(im1, H2to1, out_size, interpolation_type='linear'):
+    epsilon = 10e-15
+
     # Split im1 into channels
     red_channel_im1 = im1[:, :, 0]
     green_channel_im1 = im1[:, :, 1]
     blue_channel_im1 = im1[:, :, 2]
 
-    # Create channels of output image
-    warp_im1_red_channel = np.zeros(out_size[:2])
-    warp_im1_green_channel = np.zeros(out_size[:2])
-    warp_im1_blue_channel = np.zeros(out_size[:2])
+    # Create blank output image canvas
+    warp_im1 = np.zeros((out_size[0], out_size[1], 3))
 
     # Create mappings for interpolation
-    upper_left_corner = H @ np.array([0, 0, 1]).T
-    upper_left_corner = upper_left_corner / upper_left_corner[2]
+    upper_left_corner = H2to1 @ np.array([0, 0, 1]).T
+    upper_left_corner = upper_left_corner / (upper_left_corner[2] + epsilon)
 
-    bottom_left_corner = H @ np.array([0, out_size[0], 1]).T
-    bottom_left_corner = bottom_left_corner / bottom_left_corner[2]
+    bottom_left_corner = H2to1 @ np.array([0, out_size[0], 1]).T
+    bottom_left_corner = bottom_left_corner / (bottom_left_corner[2] + epsilon)
 
-    upper_right_corner = H @ np.array([out_size[1], 0, 1]).T
-    upper_right_corner = upper_right_corner / upper_right_corner[2]
+    upper_right_corner = H2to1 @ np.array([out_size[1], 0, 1]).T
+    upper_right_corner = upper_right_corner / (upper_right_corner[2] + epsilon)
 
     x_grid = np.linspace(upper_left_corner[0], upper_right_corner[0],
                          im1.shape[1])
@@ -203,19 +272,15 @@ def warpH(im1, H, out_size, interpolation_type='linear'):
 
     for y in range(out_size[0]):
         for x in range(out_size[1]):
-            new_coords = H @ np.array([x, y, 1]).T
-            new_coords = new_coords / new_coords[2]
+            new_coords = H2to1 @ np.array([x, y, 1]).T
+            new_coords = new_coords / (new_coords[2] + epsilon)
             red_value = f_red(new_coords[0], new_coords[1])
             green_value = f_green(new_coords[0], new_coords[1])
             blue_value = f_blue(new_coords[0], new_coords[1])
-            warp_im1_red_channel[y, x] = red_value
-            warp_im1_green_channel[y, x] = green_value
-            warp_im1_blue_channel[y, x] = blue_value
+            warp_im1[y, x, 0] = red_value
+            warp_im1[y, x, 1] = green_value
+            warp_im1[y, x, 2] = blue_value
 
-    warp_im1 = np.zeros(out_size)
-    warp_im1[:, :, 0] = warp_im1_red_channel
-    warp_im1[:, :, 1] = warp_im1_green_channel
-    warp_im1[:, :, 2] = warp_im1_blue_channel
     warp_im1 = warp_im1.astype(np.uint8)
     return warp_im1
 
@@ -250,7 +315,13 @@ def Q1Two():
 
 # TODO test func - delete at end
 def outSizeTestFunc():
-    return computeOutSize(im1, im2, H2to1)
+    return computeOutSize(im1, H2to1)
+
+
+# Question 1.3
+def Q1Three():
+    warped_im1 = warpH(im1, H2to1, out_size, interpolation_type='linear')
+    return warped_im1
 
 
 ################################################################################
@@ -275,5 +346,16 @@ if __name__ == '__main__':
 
     H2to1 = computeH(p1, p2)
 
-    out_size, y_offset, x_offset = outSizeTestFunc()
-    print(f"{out_size, y_offset, x_offset}")
+    out_size = outSizeTestFunc()
+    print(f"{out_size}")
+
+    warped_im1 = Q1Three()
+    # plt.imshow(warped_im1)
+
+    out_size_for_alignment1 = computeOutSizeForAxisAlignment(im1, im2,
+                                                             H2to1)
+    print(out_size_for_alignment1)
+
+    warped_im1_aligned = alignImage(im1, im2, warped_im1, H2to1, True)
+    plt.imshow(warped_im1_aligned)
+    print("end")
