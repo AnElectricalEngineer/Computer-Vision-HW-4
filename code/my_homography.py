@@ -6,10 +6,10 @@ from matplotlib import pyplot as plt
 from scipy import interpolate
 import numpy.ma as ma
 
-
 # Add imports if needed:
 
 import random
+
 
 # end imports
 
@@ -86,6 +86,7 @@ def computeOutSizeForAxisAlignment(im1, im2, H2to1):
 
     # height and width of image to be warped
     height_im1, width_im1 = im1.shape[:2]
+
     height_im2, width_im2 = im2.shape[:2]
 
     old_upper_left_corner = np.float32([0, 0, 1])
@@ -148,6 +149,10 @@ def alignImage(im1, im2, warpedIm1, H2to1, align_warped_im=True):
 
 
 # Here we took 10 best features...make sure correct
+# TODO look at mergeSeveralImages() method from reference 1 -
+#  I think we did this part wrong...best I think to start from center
+#  outward, AND compute warps based on (possibly warped) images only,
+#  not entire panorama
 def createBigPanorama(images, mode='SIFT'):
     current_result = images[0]
     if mode == 'SIFT':
@@ -165,7 +170,6 @@ def createBigPanorama(images, mode='SIFT'):
             current_result = imageStitching(image_aligned,
                                             warped_im1_SIFT_aligned)
         return current_result
-
 
 
 # Extra functions end
@@ -257,6 +261,7 @@ def warpH(im1, H2to1, out_size, interpolation_type='linear'):
     warp_im1 = np.zeros((out_size[0], out_size[1], 3))
 
     # Create mappings for interpolation
+    # TODO maybe remove epsilons?
     upper_left_corner = H2to1 @ np.array([0, 0, 1]).T
     upper_left_corner = upper_left_corner / (upper_left_corner[2] + epsilon)
 
@@ -287,6 +292,7 @@ def warpH(im1, H2to1, out_size, interpolation_type='linear'):
     for y in range(out_size[0]):
         for x in range(out_size[1]):
             new_coords = H2to1 @ np.array([x, y, 1]).T
+            # TODO maybe remove epsilon?
             new_coords = new_coords / (new_coords[2] + epsilon)
             red_value = f_red(new_coords[0], new_coords[1])
             green_value = f_green(new_coords[0], new_coords[1])
@@ -310,7 +316,6 @@ def ransacH(p1, p2, nIter=250, tol=3):
     num_points = p1.shape[1]
     p2_homogeneous = np.vstack((p2, np.ones((1, num_points))))
     max_num_inliers = 0
-    indicies_of_inliers = np.zeros(num_points)
 
     for i in range(nIter):
         # choose 4 random points
@@ -318,18 +323,19 @@ def ransacH(p1, p2, nIter=250, tol=3):
         random_indexes = random.sample(range(0, num_points), 4)
         chosen_points_1 = p1[:, random_indexes]
         chosen_points_2 = p2[:, random_indexes]
+
+        # compute H based on 4 random points
         H2to1 = computeH(chosen_points_1, chosen_points_2)
 
+        # check norma
         projected_points = H2to1 @ p2_homogeneous
         projected_points[:, :] /= projected_points[2, :]
-        norms = np.sum((projected_points[:2] - p1)**2, axis=0)
-        num_inliers = np.count_nonzero(norms < tol**2)
-        if(num_inliers >= max_num_inliers):
+        norms = np.sum((projected_points[:2] - p1) ** 2, axis=0)
+        num_inliers = np.count_nonzero(norms < tol ** 2)
+        if (num_inliers >= max_num_inliers):
             max_num_inliers = num_inliers
-            indicies_of_inliers = np.array(np.where(norms < tol**2))
+            bestH = H2to1
 
-    bestH = computeH(np.squeeze(p1[:, indicies_of_inliers]), np.squeeze(p2[:,
-                                                      indicies_of_inliers]))
     return bestH
 
 
@@ -364,12 +370,6 @@ def getPoints_SIFT(im1, im2):
 def Q1Two():
     projectPoints(im1, im2, 6)
 
-
-# TODO test func - delete at end
-def outSizeTestFunc():
-    return computeOutSize(im1, H2to1)
-
-
 # Question 1.3
 def Q1Three():
     warped_im1 = warpH(im1, H2to1, out_size, interpolation_type='linear')
@@ -397,8 +397,7 @@ if __name__ == '__main__':
                     532.17495161, 244.29430645]])
 
     H2to1 = computeH(p1, p2)
-
-    out_size = outSizeTestFunc()
+    out_size = computeOutSize(im1, H2to1)
     print(f"{out_size}")
 
     # warped_im1 = Q1Three()
@@ -408,34 +407,33 @@ if __name__ == '__main__':
     warped_im1 = np.load('./../temp/warped_im1.npy')
     out_size_for_alignment1 = computeOutSizeForAxisAlignment(im1, im2,
                                                              H2to1)
-    print(out_size_for_alignment1)
+    # print(out_size_for_alignment1)
 
     warped_im1_aligned = alignImage(im1, im2, warped_im1, H2to1, True)
     # plt.imshow(warped_im1_aligned)
 
     im2_aligned = alignImage(im1, im2, warped_im1, H2to1, False)
-    #plt.imshow(im2_aligned)
+    # plt.imshow(im2_aligned)
 
     stitched_image = imageStitching(im2_aligned, warped_im1_aligned)
-    #plt.imshow(stitched_image)
+    plt.imshow(stitched_image)
 
     p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
-    H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
-    out_size_im_1_sift_warped = computeOutSize(im1, H_SIFT_2to1)
+    # H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+    # out_size_im_1_sift_warped = computeOutSize(im1, H_SIFT_2to1)
     # warped_im1_SIFT = warpH(im1, H_SIFT_2to1, out_size_im_1_sift_warped,
     #                         interpolation_type='linear')
     # np.save('./../temp/warped_im1_SIFT', warped_im1_SIFT)
 
-    warped_im1_SIFT = np.load('./../temp/warped_im1_SIFT.npy')
+    # warped_im1_SIFT = np.load('./../temp/warped_im1_SIFT.npy')
     # plt.imshow(warped_im1_SIFT)
 
-
-    warped_im1_SIFT_aligned = alignImage(im1, im2, warped_im1_SIFT,
-                                         H_SIFT_2to1, True)
-    im2_aligned = alignImage(im1, im2, warped_im1_SIFT, H_SIFT_2to1, False)
+    # warped_im1_SIFT_aligned = alignImage(im1, im2, warped_im1_SIFT,
+    #                                      H_SIFT_2to1, True)
+    # im2_aligned = alignImage(im1, im2, warped_im1_SIFT, H_SIFT_2to1, False)
 
     # plt.imshow(warped_im1_SIFT_aligned)
-    stitched_image_SIFT = imageStitching(im2_aligned, warped_im1_SIFT_aligned)
+    # stitched_image_SIFT = imageStitching(im2_aligned, warped_im1_SIFT_aligned)
     # plt.imshow(stitched_image_SIFT)
 
     # beach_images = [cv2.imread('./data/beach1.jpg'),
@@ -443,7 +441,7 @@ if __name__ == '__main__':
     #                 cv2.imread('./data/beach3.jpg'),
     #                 cv2.imread('./data/beach4.jpg')]
     #
-    # scale_percent = 40  # percent of original size
+    # scale_percent = 30  # percent of original size
     # width = int(beach_images[0].shape[1] * scale_percent / 100)
     # height = int(beach_images[0].shape[0] * scale_percent / 100)
     # dim = (width, height)
@@ -456,7 +454,21 @@ if __name__ == '__main__':
     # SIFT_result = cv2.cvtColor(SIFT_result, cv2.COLOR_BGR2RGB)
     # plt.imshow(SIFT_result)
 
-    H2to1_Ransac_SIFT = ransacH(p1_SIFT, p1_SIFT)
-    print(H2to1_Ransac_SIFT)
+    palace_images = [cv2.imread('./data/sintra5.JPG'),
+                     cv2.imread('./data/sintra4.JPG')]
+
+    scale_percent = 20  # percent of original size
+    width = int(palace_images[0].shape[1] * scale_percent / 100)
+    height = int(palace_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    palace_images = [cv2.resize(img, dim) for img in palace_images]
+
+    SIFT_result_palace = createBigPanorama(palace_images)
+    SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
+    plt.imshow(SIFT_result_palace)
+
+    # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p1_SIFT)
+    # print(H2to1_Ransac_SIFT)
 
     print("end")
