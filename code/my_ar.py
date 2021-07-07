@@ -29,15 +29,31 @@ def create_ref(im_path):
         plt.draw()
     p1 = np.array(p1)
     p1 = p1.T
+
+    # x_min = int(np.floor(np.min(p1[0])))
+    # x_max = int(np.ceil(np.max(p1[0])))
+    # y_min = int(np.floor(np.min(p1[1])))
+    # y_max = int(np.ceil(np.max(p1[1])))
+    # book_im_cropped = book_im[y_min:y_max, x_min:x_max]
+    # fig, axes = plt.subplots(1, 1)
+    # axes.imshow(book_im_cropped)
+
     # p1 = np.stack(p1).astype("float32")
 
     width = 350
     height = 440
+    # width = 672
+    # height = 874
     rectangle_points = np.array([[0, width, 0, width], [0, 0, height, height]])
+
 
     H2to1 = mh.computeH(p1, rectangle_points)
     out_size = mh.computeOutSize(book_im, H2to1)
     ref_image = mh.warpH(book_im, H2to1, out_size, interpolation_type='linear')
+    # H2to1 = mh.computeH(p1, rectangle_points)
+    # out_size = mh.computeOutSize(book_im_cropped, H2to1)
+    # ref_image = mh.warpH(book_im_cropped, H2to1, out_size,
+    #                      interpolation_type='linear')
 
     # dst = np.array([
     #     [0, 0],
@@ -50,8 +66,8 @@ def create_ref(im_path):
 
 if __name__ == '__main__':
     print('my_ar')
-    test_image = create_ref('data/pf_desk.jpg')
-    fig, axes = plt.subplots(1,1)
+    test_image = create_ref('data/pf_floor.jpg')
+    fig, axes = plt.subplots(1, 1)
     axes.imshow(test_image)
 
     print('end')
