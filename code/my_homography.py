@@ -177,6 +177,7 @@ def createBigPanorama(images, mode='SIFT'):
 # HW functions:
 
 def getPoints(im1, im2, N):
+    fig1, axes1 = plt.subplots(1, 2)
     axes1[0].imshow(im1)
     axes1[1].imshow(im2)
     axes1[0].set_xticks([])
@@ -241,6 +242,7 @@ def computeH(p1, p2):
     A[1::2, 8] = -v_i  # put -v_i in the 9th column of all the odd rows of A
 
     _lambda, V = np.linalg.eig(A.T @ A)
+    # TODO maybe change to np.abs(_lambda).argmin()
     indexOfSmallestLambda = np.argmin(_lambda)
     H2to1 = V[:, indexOfSmallestLambda].reshape((3, 3))
 
@@ -249,7 +251,8 @@ def computeH(p1, p2):
 
 ################################################################################
 
-def warpH(im1, H2to1, out_size, interpolation_type='linear'):
+# TODO change all the transposeds
+def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
     epsilon = 10e-15
 
     # Split im1 into channels
@@ -258,57 +261,85 @@ def warpH(im1, H2to1, out_size, interpolation_type='linear'):
     blue_channel_im1 = im1[:, :, 2]
 
     # Create blank output image canvas
-    warp_im1 = np.zeros((out_size[0], out_size[1], 3))
+    # warp_im1 = np.zeros((out_size[0], out_size[1], 3))
+    warp_im1 = np.zeros((out_size[1], out_size[0], 3))
 
     # Create mappings for interpolation
     # TODO maybe remove epsilons?
-    upper_left_corner = H2to1 @ np.array([0, 0, 1]).T
-    upper_left_corner = upper_left_corner / (upper_left_corner[2] + epsilon)
+    # upper_left_corner = H2to1 @ np.array([0, 0, 1]).T
+    # upper_left_corner = upper_left_corner / (upper_left_corner[2] + epsilon)
+    #
+    # bottom_left_corner = H2to1 @ np.array([0, out_size[0], 1]).T
+    # bottom_left_corner = bottom_left_corner / (bottom_left_corner[2] + epsilon)
+    #
+    # upper_right_corner = H2to1 @ np.array([out_size[1], 0, 1]).T
+    # upper_right_corner = upper_right_corner / (upper_right_corner[2] + epsilon)
+    #
+    # x_grid = np.linspace(upper_left_corner[0], upper_right_corner[0],
+    #                      im1.shape[1])
+    # y_grid = np.linspace(upper_left_corner[1], bottom_left_corner[1],
+    #                      im1.shape[0])
 
-    bottom_left_corner = H2to1 @ np.array([0, out_size[0], 1]).T
-    bottom_left_corner = bottom_left_corner / (bottom_left_corner[2] + epsilon)
-
-    upper_right_corner = H2to1 @ np.array([out_size[1], 0, 1]).T
-    upper_right_corner = upper_right_corner / (upper_right_corner[2] + epsilon)
-
-    x_grid = np.linspace(upper_left_corner[0], upper_right_corner[0],
-                         im1.shape[1])
-    y_grid = np.linspace(upper_left_corner[1], bottom_left_corner[1],
-                         im1.shape[0])
+    x_grid = np.arange(im1.shape[0]).astype(float)
+    y_grid = np.arange(im1.shape[1]).astype(float)
 
     # Interpolate by channel
-    f_red = interpolate.interp2d(x_grid, y_grid, red_channel_im1,
+    f_red = interpolate.interp2d(x_grid, y_grid, red_channel_im1.T,
                                  kind=interpolation_type,
                                  fill_value=0)
 
-    f_green = interpolate.interp2d(x_grid, y_grid, green_channel_im1,
+    f_green = interpolate.interp2d(x_grid, y_grid, green_channel_im1.T,
                                    kind=interpolation_type,
                                    fill_value=0)
 
-    f_blue = interpolate.interp2d(x_grid, y_grid, blue_channel_im1,
+    f_blue = interpolate.interp2d(x_grid, y_grid, blue_channel_im1.T,
                                   kind=interpolation_type,
                                   fill_value=0)
 
-    for y in range(out_size[0]):
-        for x in range(out_size[1]):
-            new_coords = H2to1 @ np.array([x, y, 1]).T
+    # for y in range(out_size[0]):
+    #     for x in range(out_size[1]):
+    for x in range(out_size[1]):
+        for y in range(out_size[0]):
+            # new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1]).T
+            new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1])
             # TODO maybe remove epsilon?
             new_coords = new_coords / (new_coords[2] + epsilon)
-            red_value = f_red(new_coords[0], new_coords[1])
-            green_value = f_green(new_coords[0], new_coords[1])
-            blue_value = f_blue(new_coords[0], new_coords[1])
-            warp_im1[y, x, 0] = red_value
-            warp_im1[y, x, 1] = green_value
-            warp_im1[y, x, 2] = blue_value
+            if 0 <= new_coords[0] < len(y_grid) and 0 <= new_coords[1] < len(
+                    x_grid):
+                # red_value = f_red(new_coords[0], new_coords[1])
+                # green_value = f_green(new_coords[0], new_coords[1])
+                # blue_value = f_blue(new_coords[0], new_coords[1])
+                # warp_im1[y, x, 0] = red_value
+                # warp_im1[y, x, 1] = green_value
+                # warp_im1[y, x, 2] = blue_value
+
+                red_value = f_red(new_coords[1], new_coords[0])
+                green_value = f_green(new_coords[1], new_coords[0])
+                blue_value = f_blue(new_coords[1], new_coords[0])
+                warp_im1[x, y, 0] = red_value
+                warp_im1[x, y, 1] = green_value
+                warp_im1[x, y, 2] = blue_value
 
     warp_im1 = warp_im1.astype(np.uint8)
+    warp_im1 = np.transpose(warp_im1, (1, 0, 2))
     return warp_im1
 
+# TODO review this
+# def imageStitching(im1, im2):
+#     im1_mask = np.where(im1 == [0, 0, 0])
+#     panoImg = im1
+#     panoImg[im1_mask] = im2[im1_mask]
+#     return panoImg
 
-def imageStitching(im1, im2):
-    im1_mask = np.where(im1 == [0, 0, 0])
+def imageStitching(im1, im2, y_down_amount, x_right_amount):
+    h1, w1, _ = im2.shape
+    im2_aligned = np.zeros(im1.shape)
+    im2_aligned[-y_down_amount:h1 - y_down_amount, -x_right_amount:w1 -
+                                                                   x_right_amount, :] = np.copy(im2)
+    im2_mask = np.where(im1 == [0, 0, 0])
     panoImg = im1
-    panoImg[im1_mask] = im2[im1_mask]
+    panoImg[im2_mask] = im2_aligned[im2_mask]
+    panoImg = panoImg.astype('uint8')
     return panoImg
 
 
@@ -370,9 +401,11 @@ def getPoints_SIFT(im1, im2):
 def Q1Two():
     projectPoints(im1, im2, 6)
 
+
 # Question 1.3
 def Q1Three():
-    warped_im1 = warpH(im1, H2to1, out_size, interpolation_type='linear')
+    warped_im1 = warpH(im1, H2to1, out_size, y_down_amount, x_right_amount,
+                       interpolation_type='linear')
     return warped_im1
 
 
@@ -387,38 +420,53 @@ if __name__ == '__main__':
     # fig1, axes1 = plt.subplots(1, 2)
     # Q1Two()
 
-    p1 = np.array([[454.5436828, 511.94919355, 602.95793011, 623.95994624,
-                    640.76155914, 612.75887097], [110.43200202, 111.83213642,
-                                                  484.26788911, 481.4676203,
-                                                  482.8677547, 197.24033535]])
-    p2 = np.array([[118.05591398, 185.7, 294.24516129, 316.2688172,
-                    335.14623656, 294.24516129],
-                   [151.48032796, 154.62656452, 536.89430645, 535.32118817,
-                    532.17495161, 244.29430645]])
+    # p1 = np.array([[454.5436828, 511.94919355, 602.95793011, 623.95994624,
+    #                 640.76155914, 612.75887097], [110.43200202, 111.83213642,
+    #                                               484.26788911, 481.4676203,
+    #                                               482.8677547, 197.24033535]])
+    # p2 = np.array([[118.05591398, 185.7, 294.24516129, 316.2688172,
+    #                 335.14623656, 294.24516129],
+    #                [151.48032796, 154.62656452, 536.89430645, 535.32118817,
+    #                 532.17495161, 244.29430645]])
+
+    p1 = np.array(
+        [[517.60420168, 703.15042017, 603.11680672, 520.83109244, 541.80588235,
+          627.31848739, 383.68823529],
+         [450.61932773, 516.77058824, 502.24957983, 171.49327731, 126.31680672,
+          255.39243697, 182.78739496]])
+    p2 = np.array(
+        [[202.98235294, 394.98235294, 296.56218487, 198.14201681, 220.7302521,
+          311.08319328, 40.02436975],
+         [508.05798319, 559.68823529, 558.07478992, 220.86470588, 172.46134454,
+          306.37731092, 228.93193277]])
 
     H2to1 = computeH(p1, p2)
-    out_size = computeOutSize(im1, H2to1)
-    print(f"{out_size}")
+    # out_size = computeOutSize(im1, H2to1)
+    # print(f"{out_size}")
+
+    out_size, y_down_amount, x_right_amount = computeOutSizeForAxisAlignment(
+        im1, im2, H2to1)
 
     # warped_im1 = Q1Three()
     # np.save('./../temp/warped_im1', warped_im1)
     # plt.imshow(warped_im1)
 
-    warped_im1 = np.load('./../temp/warped_im1.npy')
-    out_size_for_alignment1 = computeOutSizeForAxisAlignment(im1, im2,
-                                                             H2to1)
+    warped_im1_aligned = np.load('./../temp/warped_im1.npy')
+    # out_size_for_alignment1 = computeOutSizeForAxisAlignment(im1, im2,
+    #                                                          H2to1)
     # print(out_size_for_alignment1)
 
-    warped_im1_aligned = alignImage(im1, im2, warped_im1, H2to1, True)
+    # warped_im1_aligned = alignImage(im1, im2, warped_im1, H2to1, True)
     # plt.imshow(warped_im1_aligned)
 
-    im2_aligned = alignImage(im1, im2, warped_im1, H2to1, False)
+    # im2_aligned = alignImage(im1, im2, warped_im1_aligned, H2to1, False)
     # plt.imshow(im2_aligned)
 
-    stitched_image = imageStitching(im2_aligned, warped_im1_aligned)
+    stitched_image = imageStitching(warped_im1_aligned, im2, y_down_amount,
+                                    x_right_amount)
     plt.imshow(stitched_image)
 
-    p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
+    # p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
     # H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
     # out_size_im_1_sift_warped = computeOutSize(im1, H_SIFT_2to1)
     # warped_im1_SIFT = warpH(im1, H_SIFT_2to1, out_size_im_1_sift_warped,
@@ -454,19 +502,19 @@ if __name__ == '__main__':
     # SIFT_result = cv2.cvtColor(SIFT_result, cv2.COLOR_BGR2RGB)
     # plt.imshow(SIFT_result)
 
-    palace_images = [cv2.imread('./data/sintra5.JPG'),
-                     cv2.imread('./data/sintra4.JPG')]
-
-    scale_percent = 20  # percent of original size
-    width = int(palace_images[0].shape[1] * scale_percent / 100)
-    height = int(palace_images[0].shape[0] * scale_percent / 100)
-    dim = (width, height)
-
-    palace_images = [cv2.resize(img, dim) for img in palace_images]
-
-    SIFT_result_palace = createBigPanorama(palace_images)
-    SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
-    plt.imshow(SIFT_result_palace)
+    # palace_images = [cv2.imread('./data/sintra5.JPG'),
+    #                  cv2.imread('./data/sintra4.JPG')]
+    #
+    # scale_percent = 20  # percent of original size
+    # width = int(palace_images[0].shape[1] * scale_percent / 100)
+    # height = int(palace_images[0].shape[0] * scale_percent / 100)
+    # dim = (width, height)
+    #
+    # palace_images = [cv2.resize(img, dim) for img in palace_images]
+    #
+    # SIFT_result_palace = createBigPanorama(palace_images)
+    # SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
+    # plt.imshow(SIFT_result_palace)
 
     # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p1_SIFT)
     # print(H2to1_Ransac_SIFT)
