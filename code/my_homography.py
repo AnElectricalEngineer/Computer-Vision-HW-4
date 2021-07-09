@@ -38,55 +38,17 @@ def projectPoints(im1, im2, N):
                 "Example.png")
 
 
-# Computes the size of an image im1 after a warp H1to2 is applied to it
-def computeOutSize(im1, H2to1):
-    H1to2 = np.linalg.inv(H2to1)
-
-    # height and width of image to be warped
-    height_im1, width_im1 = im1.shape[:2]
-
-    old_upper_left_corner = np.float32([0, 0, 1])
-    old_upper_right_corner = np.float32([width_im1, 0, 1])
-    old_lower_left_corner = np.float32([0, height_im1, 1])
-    old_lower_right_corner = np.float32([width_im1, height_im1, 1])
-
-    # The corners of the image im1 before warping
-    old_corners = np.float32([old_upper_left_corner, old_upper_right_corner,
-                              old_lower_left_corner,
-                              old_lower_right_corner]).T
-
-    # The corners of the image im1 after warping (after H1to2 is applied)
-    new_corners = H1to2 @ old_corners
-    # Adjust for scale
-    new_corners[:, 0] /= new_corners[2, 0]
-    new_corners[:, 1] /= new_corners[2, 1]
-    new_corners[:, 2] /= new_corners[2, 2]
-    new_corners[:, 3] /= new_corners[2, 3]
-
-    # Calculate necessary size of new warped image
-
-    # Find min X, Y coordinates
-    x_min = np.min((np.floor(new_corners[0, :])))
-    y_min = np.min((np.floor(new_corners[1, :])))
-
-    # Find max X, Y coordinates
-    x_max = np.max((np.ceil(new_corners[0, :])))
-    y_max = np.max((np.ceil(new_corners[1, :])))
-
-    new_width = int(x_max - x_min)
-    new_height = int(y_max - y_min)
-    out_size = (new_height, new_width, 3)
-    return out_size
-
-
 # Computes the size of the bounding box needed to warp an image im1 (left
-# image) and stitch it to im2 (unwarped image - right side)
-def computeOutSizeForAxisAlignment(im1, im2, H2to1):
+# image) and stitch it to im2 (unwarped image - right side). Returns the
+# size, and the amount by which to shift the right (static) image down and
+# right by.
+def computeOutSize(im1, im2, H2to1):
     H1to2 = np.linalg.inv(H2to1)
 
     # height and width of image to be warped
     height_im1, width_im1 = im1.shape[:2]
 
+    # height and width of static image
     height_im2, width_im2 = im2.shape[:2]
 
     old_upper_left_corner = np.float32([0, 0, 1])
@@ -129,25 +91,6 @@ def computeOutSizeForAxisAlignment(im1, im2, H2to1):
     return (warped_im_height, warped_im_width, 3), y_down_amount, x_right_amount
 
 
-def alignImage(im1, im2, warpedIm1, H2to1, align_warped_im=True):
-    H1to2 = np.linalg.inv(H2to1)
-    total_out_size, y_down_amount, x_right_amount = \
-        computeOutSizeForAxisAlignment(im1, im2, H2to1)
-    # TODO maybe put warped_im1 here instead of im1
-
-    if align_warped_im == True:
-        warped_im1_aligned = np.zeros(total_out_size)
-        warped_im1_mask = np.where(warpedIm1 != [0, 0, 0])
-        warped_im1_aligned[warped_im1_mask] = warpedIm1[warped_im1_mask]
-        return warped_im1_aligned.astype(np.uint8)
-    else:
-        im2_aligned = np.zeros(total_out_size)
-        im2_mask = np.where(im2 != [0, 0, 0])
-        im2_aligned[im2_mask[0] - y_down_amount, im2_mask[1] - x_right_amount,
-                    im2_mask[2]] = im2[im2_mask]
-        return im2_aligned.astype(np.uint8)
-
-
 # Here we took 10 best features...make sure correct
 # TODO look at mergeSeveralImages() method from reference 1 -
 #  I think we did this part wrong...best I think to start from center
@@ -159,16 +102,13 @@ def createBigPanorama(images, mode='SIFT'):
         for i, image in enumerate(images[1:]):
             p1_SIFT, p2_SIFT = getPoints_SIFT(current_result, image)
             H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
-            out_size = computeOutSize(current_result, H_SIFT_2to1)
+            out_size, y_down_amount, x_right_amount = \
+                computeOutSize(current_result, H_SIFT_2to1)
             warped_im1_SIFT = warpH(current_result, H_SIFT_2to1, out_size,
+                                    y_down_amount, x_right_amount,
                                     interpolation_type='linear')
-            warped_im1_SIFT_aligned = alignImage(current_result, image,
-                                                 warped_im1_SIFT, H_SIFT_2to1,
-                                                 True)
-            image_aligned = alignImage(current_result, image, warped_im1_SIFT,
-                                       H_SIFT_2to1, False)
-            current_result = imageStitching(image_aligned,
-                                            warped_im1_SIFT_aligned)
+            current_result = imageStitching(image, warped_im1_SIFT,
+                                            y_down_amount, x_right_amount)
         return current_result
 
 
@@ -177,7 +117,6 @@ def createBigPanorama(images, mode='SIFT'):
 # HW functions:
 
 def getPoints(im1, im2, N):
-    fig1, axes1 = plt.subplots(1, 2)
     axes1[0].imshow(im1)
     axes1[1].imshow(im2)
     axes1[0].set_xticks([])
@@ -261,8 +200,8 @@ def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
     blue_channel_im1 = im1[:, :, 2]
 
     # Create blank output image canvas
-    # warp_im1 = np.zeros((out_size[0], out_size[1], 3))
-    warp_im1 = np.zeros((out_size[1], out_size[0], 3))
+    warp_im1 = np.zeros((out_size[0], out_size[1], 3))
+    # warp_im1 = np.zeros((out_size[1], out_size[0], 3))
 
     # Create mappings for interpolation
     # TODO maybe remove epsilons?
@@ -280,19 +219,19 @@ def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
     # y_grid = np.linspace(upper_left_corner[1], bottom_left_corner[1],
     #                      im1.shape[0])
 
-    x_grid = np.arange(im1.shape[0]).astype(float)
-    y_grid = np.arange(im1.shape[1]).astype(float)
+    x_grid = np.arange(im1.shape[1]).astype(float)
+    y_grid = np.arange(im1.shape[0]).astype(float)
 
     # Interpolate by channel
-    f_red = interpolate.interp2d(x_grid, y_grid, red_channel_im1.T,
+    f_red = interpolate.interp2d(x_grid, y_grid, red_channel_im1,
                                  kind=interpolation_type,
                                  fill_value=0)
 
-    f_green = interpolate.interp2d(x_grid, y_grid, green_channel_im1.T,
+    f_green = interpolate.interp2d(x_grid, y_grid, green_channel_im1,
                                    kind=interpolation_type,
                                    fill_value=0)
 
-    f_blue = interpolate.interp2d(x_grid, y_grid, blue_channel_im1.T,
+    f_blue = interpolate.interp2d(x_grid, y_grid, blue_channel_im1,
                                   kind=interpolation_type,
                                   fill_value=0)
 
@@ -300,45 +239,31 @@ def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
     #     for x in range(out_size[1]):
     for x in range(out_size[1]):
         for y in range(out_size[0]):
-            # new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1]).T
-            new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1])
-            # TODO maybe remove epsilon?
+            new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1]).T
+            # new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1])
             new_coords = new_coords / (new_coords[2] + epsilon)
-            if 0 <= new_coords[0] < len(y_grid) and 0 <= new_coords[1] < len(
+            if 0 <= new_coords[1] < len(y_grid) and 0 <= new_coords[0] < len(
                     x_grid):
-                # red_value = f_red(new_coords[0], new_coords[1])
-                # green_value = f_green(new_coords[0], new_coords[1])
-                # blue_value = f_blue(new_coords[0], new_coords[1])
-                # warp_im1[y, x, 0] = red_value
-                # warp_im1[y, x, 1] = green_value
-                # warp_im1[y, x, 2] = blue_value
-
-                red_value = f_red(new_coords[1], new_coords[0])
-                green_value = f_green(new_coords[1], new_coords[0])
-                blue_value = f_blue(new_coords[1], new_coords[0])
-                warp_im1[x, y, 0] = red_value
-                warp_im1[x, y, 1] = green_value
-                warp_im1[x, y, 2] = blue_value
+                red_value = f_red(new_coords[0], new_coords[1])
+                green_value = f_green(new_coords[0], new_coords[1])
+                blue_value = f_blue(new_coords[0], new_coords[1])
+                warp_im1[y, x, 0] = red_value
+                warp_im1[y, x, 1] = green_value
+                warp_im1[y, x, 2] = blue_value
 
     warp_im1 = warp_im1.astype(np.uint8)
-    warp_im1 = np.transpose(warp_im1, (1, 0, 2))
+    # warp_im1 = np.transpose(warp_im1, (1, 0, 2))
     return warp_im1
 
-# TODO review this
-# def imageStitching(im1, im2):
-#     im1_mask = np.where(im1 == [0, 0, 0])
-#     panoImg = im1
-#     panoImg[im1_mask] = im2[im1_mask]
-#     return panoImg
 
 def imageStitching(im1, im2, y_down_amount, x_right_amount):
-    h1, w1, _ = im2.shape
     im2_aligned = np.zeros(im1.shape)
-    im2_aligned[-y_down_amount:h1 - y_down_amount, -x_right_amount:w1 -
-                                                                   x_right_amount, :] = np.copy(im2)
-    im2_mask = np.where(im1 == [0, 0, 0])
+    im2_aligned[-y_down_amount:im2.shape[0] - y_down_amount,
+    - x_right_amount:im2.shape[1] - x_right_amount, :] = np.copy(im2)
+
+    im1_mask = np.where(im1 == [0, 0, 0])
     panoImg = im1
-    panoImg[im2_mask] = im2_aligned[im2_mask]
+    panoImg[im1_mask] = im2_aligned[im1_mask]
     panoImg = panoImg.astype('uint8')
     return panoImg
 
@@ -441,26 +366,13 @@ if __name__ == '__main__':
           306.37731092, 228.93193277]])
 
     H2to1 = computeH(p1, p2)
-    # out_size = computeOutSize(im1, H2to1)
-    # print(f"{out_size}")
-
-    out_size, y_down_amount, x_right_amount = computeOutSizeForAxisAlignment(
-        im1, im2, H2to1)
+    out_size, y_down_amount, x_right_amount = computeOutSize(im1, im2, H2to1)
 
     # warped_im1 = Q1Three()
     # np.save('./../temp/warped_im1', warped_im1)
     # plt.imshow(warped_im1)
 
     warped_im1_aligned = np.load('./../temp/warped_im1.npy')
-    # out_size_for_alignment1 = computeOutSizeForAxisAlignment(im1, im2,
-    #                                                          H2to1)
-    # print(out_size_for_alignment1)
-
-    # warped_im1_aligned = alignImage(im1, im2, warped_im1, H2to1, True)
-    # plt.imshow(warped_im1_aligned)
-
-    # im2_aligned = alignImage(im1, im2, warped_im1_aligned, H2to1, False)
-    # plt.imshow(im2_aligned)
 
     stitched_image = imageStitching(warped_im1_aligned, im2, y_down_amount,
                                     x_right_amount)
