@@ -97,19 +97,50 @@ def computeOutSize(im1, im2, H2to1):
 #  outward, AND compute warps based on (possibly warped) images only,
 #  not entire panorama
 def createBigPanorama(images, mode='SIFT'):
-    current_result = images[0]
+    left_side = images[:1 + (len(images) // 2)]
+    right_side = [x for x in reversed(images[1 + (len(images) // 2):])]
+    current_result_left = left_side[0]
+    current_result_right = right_side[0]
+
     if mode == 'SIFT':
-        for i, image in enumerate(images[1:]):
-            p1_SIFT, p2_SIFT = getPoints_SIFT(current_result, image)
+
+        # Stitch left side
+        for i, image in enumerate(left_side[1:]):
+            p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_left, image)
             H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
             out_size, y_down_amount, x_right_amount = \
-                computeOutSize(current_result, H_SIFT_2to1)
-            warped_im1_SIFT = warpH(current_result, H_SIFT_2to1, out_size,
+                computeOutSize(current_result_left, image, H_SIFT_2to1)
+            warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
                                     y_down_amount, x_right_amount,
                                     interpolation_type='linear')
-            current_result = imageStitching(image, warped_im1_SIFT,
-                                            y_down_amount, x_right_amount)
-        return current_result
+            current_result_left = imageStitching(warped_im1_SIFT, image,
+                                                 y_down_amount, x_right_amount)
+
+        # Stitch right side
+        for i, image in enumerate(right_side[1:]):
+            p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_right, image)
+            H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+            out_size, y_down_amount, x_right_amount = \
+                computeOutSize(current_result_right, image, H_SIFT_2to1)
+            warped_im1_SIFT = warpH(current_result_right, H_SIFT_2to1, out_size,
+                                    y_down_amount, x_right_amount,
+                                    interpolation_type='linear')
+            current_result_right = imageStitching(warped_im1_SIFT, image,
+                                                  y_down_amount, x_right_amount)
+
+        # Stitch left and right results to one large panorama
+        p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_left,
+                                          current_result_right)
+        H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+        out_size, y_down_amount, x_right_amount = \
+            computeOutSize(current_result_left, current_result_right,
+                           H_SIFT_2to1)
+        warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
+                                y_down_amount, x_right_amount,
+                                interpolation_type='linear')
+        final_result = imageStitching(warped_im1_SIFT, current_result_right,
+                                      y_down_amount, x_right_amount)
+        return final_result
 
 
 # Extra functions end
@@ -268,6 +299,8 @@ def imageStitching(im1, im2, y_down_amount, x_right_amount):
     return panoImg
 
 
+# TODO look at lecture slide "estimating homography using Ransac - ransac
+#  loop" - last bullet is "Recompute H using ALL inliers. So change here.
 def ransacH(p1, p2, nIter=250, tol=3):
     num_points = p1.shape[1]
     p2_homogeneous = np.vstack((p2, np.ones((1, num_points))))
@@ -354,29 +387,29 @@ if __name__ == '__main__':
     #                [151.48032796, 154.62656452, 536.89430645, 535.32118817,
     #                 532.17495161, 244.29430645]])
 
-    p1 = np.array(
-        [[517.60420168, 703.15042017, 603.11680672, 520.83109244, 541.80588235,
-          627.31848739, 383.68823529],
-         [450.61932773, 516.77058824, 502.24957983, 171.49327731, 126.31680672,
-          255.39243697, 182.78739496]])
-    p2 = np.array(
-        [[202.98235294, 394.98235294, 296.56218487, 198.14201681, 220.7302521,
-          311.08319328, 40.02436975],
-         [508.05798319, 559.68823529, 558.07478992, 220.86470588, 172.46134454,
-          306.37731092, 228.93193277]])
-
-    H2to1 = computeH(p1, p2)
-    out_size, y_down_amount, x_right_amount = computeOutSize(im1, im2, H2to1)
+    # p1 = np.array(
+    #     [[517.60420168, 703.15042017, 603.11680672, 520.83109244, 541.80588235,
+    #       627.31848739, 383.68823529],
+    #      [450.61932773, 516.77058824, 502.24957983, 171.49327731, 126.31680672,
+    #       255.39243697, 182.78739496]])
+    # p2 = np.array(
+    #     [[202.98235294, 394.98235294, 296.56218487, 198.14201681, 220.7302521,
+    #       311.08319328, 40.02436975],
+    #      [508.05798319, 559.68823529, 558.07478992, 220.86470588, 172.46134454,
+    #       306.37731092, 228.93193277]])
+    #
+    # H2to1 = computeH(p1, p2)
+    # out_size, y_down_amount, x_right_amount = computeOutSize(im1, im2, H2to1)
 
     # warped_im1 = Q1Three()
     # np.save('./../temp/warped_im1', warped_im1)
     # plt.imshow(warped_im1)
 
-    warped_im1_aligned = np.load('./../temp/warped_im1.npy')
-
-    stitched_image = imageStitching(warped_im1_aligned, im2, y_down_amount,
-                                    x_right_amount)
-    plt.imshow(stitched_image)
+    # warped_im1_aligned = np.load('./../temp/warped_im1.npy')
+    #
+    # stitched_image = imageStitching(warped_im1_aligned, im2, y_down_amount,
+    #                                 x_right_amount)
+    # plt.imshow(stitched_image)
 
     # p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
     # H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
@@ -414,19 +447,20 @@ if __name__ == '__main__':
     # SIFT_result = cv2.cvtColor(SIFT_result, cv2.COLOR_BGR2RGB)
     # plt.imshow(SIFT_result)
 
-    # palace_images = [cv2.imread('./data/sintra5.JPG'),
-    #                  cv2.imread('./data/sintra4.JPG')]
-    #
-    # scale_percent = 20  # percent of original size
-    # width = int(palace_images[0].shape[1] * scale_percent / 100)
-    # height = int(palace_images[0].shape[0] * scale_percent / 100)
-    # dim = (width, height)
-    #
-    # palace_images = [cv2.resize(img, dim) for img in palace_images]
-    #
-    # SIFT_result_palace = createBigPanorama(palace_images)
-    # SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
-    # plt.imshow(SIFT_result_palace)
+    palace_images = [cv2.imread('./data/sintra5.JPG'),
+                     cv2.imread('./data/sintra4.JPG'),
+                     cv2.imread('./data/sintra3.JPG')]
+
+    scale_percent = 20  # percent of original size
+    width = int(palace_images[0].shape[1] * scale_percent / 100)
+    height = int(palace_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    palace_images = [cv2.resize(img, dim) for img in palace_images]
+
+    SIFT_result_palace = createBigPanorama(palace_images)
+    SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
+    plt.imshow(SIFT_result_palace)
 
     # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p1_SIFT)
     # print(H2to1_Ransac_SIFT)
