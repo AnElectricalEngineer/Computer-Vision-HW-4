@@ -91,14 +91,9 @@ def computeOutSize(im1, im2, H2to1):
     return (warped_im_height, warped_im_width, 3), y_down_amount, x_right_amount
 
 
-# Here we took 10 best features...make sure correct
-# TODO look at mergeSeveralImages() method from reference 1 -
-#  I think we did this part wrong...best I think to start from center
-#  outward, AND compute warps based on (possibly warped) images only,
-#  not entire panorama
-def createBigPanorama(images, mode='SIFT'):
+def createBigPanorama(images, mode='SIFT', use_ransac=True):
     left_side = images[:1 + (len(images) // 2)]
-    right_side = [x for x in reversed(images[1 + (len(images) // 2):])]
+    right_side = images[1 + (len(images) // 2):]
     current_result_left = left_side[0]
     current_result_right = right_side[0]
 
@@ -107,7 +102,10 @@ def createBigPanorama(images, mode='SIFT'):
         # Stitch left side
         for i, image in enumerate(left_side[1:]):
             p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_left, image)
-            H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+            if use_ransac == True:
+                H_SIFT_2to1 = ransacH(p1_SIFT, p2_SIFT)
+            else:
+                H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
             out_size, y_down_amount, x_right_amount = \
                 computeOutSize(current_result_left, image, H_SIFT_2to1)
             warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
@@ -119,7 +117,10 @@ def createBigPanorama(images, mode='SIFT'):
         # Stitch right side
         for i, image in enumerate(right_side[1:]):
             p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_right, image)
-            H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+            if use_ransac == True:
+                H_SIFT_2to1 = ransacH(p1_SIFT, p2_SIFT)
+            else:
+                H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
             out_size, y_down_amount, x_right_amount = \
                 computeOutSize(current_result_right, image, H_SIFT_2to1)
             warped_im1_SIFT = warpH(current_result_right, H_SIFT_2to1, out_size,
@@ -131,7 +132,10 @@ def createBigPanorama(images, mode='SIFT'):
         # Stitch left and right results to one large panorama
         p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_left,
                                           current_result_right)
-        H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+        if use_ransac == True:
+            H_SIFT_2to1 = ransacH(p1_SIFT, p2_SIFT)
+        else:
+            H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
         out_size, y_down_amount, x_right_amount = \
             computeOutSize(current_result_left, current_result_right,
                            H_SIFT_2to1)
@@ -176,7 +180,6 @@ def getPoints(im1, im2, N):
 
 # Gets a set of matching points between two images - p1, p2, and calculates
 # the transformation between them.
-# continue later
 def computeH(p1, p2):
     assert (p1.shape[1] == p2.shape[1])
     assert (p1.shape[0] == 2)
@@ -221,7 +224,6 @@ def computeH(p1, p2):
 
 ################################################################################
 
-# TODO change all the transposeds
 def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
     epsilon = 10e-15
 
@@ -232,24 +234,8 @@ def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
 
     # Create blank output image canvas
     warp_im1 = np.zeros((out_size[0], out_size[1], 3))
-    # warp_im1 = np.zeros((out_size[1], out_size[0], 3))
 
     # Create mappings for interpolation
-    # TODO maybe remove epsilons?
-    # upper_left_corner = H2to1 @ np.array([0, 0, 1]).T
-    # upper_left_corner = upper_left_corner / (upper_left_corner[2] + epsilon)
-    #
-    # bottom_left_corner = H2to1 @ np.array([0, out_size[0], 1]).T
-    # bottom_left_corner = bottom_left_corner / (bottom_left_corner[2] + epsilon)
-    #
-    # upper_right_corner = H2to1 @ np.array([out_size[1], 0, 1]).T
-    # upper_right_corner = upper_right_corner / (upper_right_corner[2] + epsilon)
-    #
-    # x_grid = np.linspace(upper_left_corner[0], upper_right_corner[0],
-    #                      im1.shape[1])
-    # y_grid = np.linspace(upper_left_corner[1], bottom_left_corner[1],
-    #                      im1.shape[0])
-
     x_grid = np.arange(im1.shape[1]).astype(float)
     y_grid = np.arange(im1.shape[0]).astype(float)
 
@@ -266,15 +252,15 @@ def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
                                   kind=interpolation_type,
                                   fill_value=0)
 
-    # for y in range(out_size[0]):
-    #     for x in range(out_size[1]):
     for x in range(out_size[1]):
         for y in range(out_size[0]):
             new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1]).T
-            # new_coords = H2to1 @ np.array([x + x_right, y + y_down, 1])
             new_coords = new_coords / (new_coords[2] + epsilon)
+
+            # Skip coordinates that are out of bounds
             if 0 <= new_coords[1] < len(y_grid) and 0 <= new_coords[0] < len(
                     x_grid):
+                # Do inverse warping
                 red_value = f_red(new_coords[0], new_coords[1])
                 green_value = f_green(new_coords[0], new_coords[1])
                 blue_value = f_blue(new_coords[0], new_coords[1])
@@ -283,10 +269,12 @@ def warpH(im1, H2to1, out_size, y_down, x_right, interpolation_type='linear'):
                 warp_im1[y, x, 2] = blue_value
 
     warp_im1 = warp_im1.astype(np.uint8)
-    # warp_im1 = np.transpose(warp_im1, (1, 0, 2))
     return warp_im1
 
 
+# Receives two images, im1, and im2. Im1 is the left image, which is warped.
+# Im2 is the right image, which is not warped. Stitches the two images
+# together and returns the panorama image.
 def imageStitching(im1, im2, y_down_amount, x_right_amount):
     im2_aligned = np.zeros(im1.shape)
     im2_aligned[-y_down_amount:im2.shape[0] - y_down_amount,
@@ -299,12 +287,11 @@ def imageStitching(im1, im2, y_down_amount, x_right_amount):
     return panoImg
 
 
-# TODO look at lecture slide "estimating homography using Ransac - ransac
-#  loop" - last bullet is "Recompute H using ALL inliers. So change here.
 def ransacH(p1, p2, nIter=250, tol=3):
     num_points = p1.shape[1]
     p2_homogeneous = np.vstack((p2, np.ones((1, num_points))))
     max_num_inliers = 0
+    best_inliers_indices = np.array([])
 
     for i in range(nIter):
         # choose 4 random points
@@ -321,10 +308,12 @@ def ransacH(p1, p2, nIter=250, tol=3):
         projected_points[:, :] /= projected_points[2, :]
         norms = np.sum((projected_points[:2] - p1) ** 2, axis=0)
         num_inliers = np.count_nonzero(norms < tol ** 2)
-        if (num_inliers >= max_num_inliers):
+        if num_inliers >= max_num_inliers:
             max_num_inliers = num_inliers
-            bestH = H2to1
+            best_inliers_indices = np.where(norms < tol ** 2)
 
+    bestH = computeH(p1[:, best_inliers_indices].squeeze(), p2[:,
+                           best_inliers_indices].squeeze())
     return bestH
 
 
@@ -336,10 +325,10 @@ def getPoints_SIFT(im1, im2):
     kp_im1, desc_im1 = sift.detectAndCompute(im1, None)
     kp_im2, desc_im2 = sift.detectAndCompute(im2, None)
 
-    # Match keypoints using L2 norm - documentation said that it is good for SIFT
-    # Use crossCheck=true which ensures that the matcher returns only those matches
-    # with value (i,j) such that i-th descriptor in set A has j-th descriptor in
-    # set B as the best match and vice-versa.
+    # Match keypoints using L2 norm - documentation said that it is good for
+    # SIFT Use crossCheck=true which ensures that the matcher returns only
+    # those matches with value (i,j) such that i-th descriptor in set A has
+    # j-th descriptor in set B as the best match and vice-versa.
     brute_force = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 
     # Get best matches of the two images
@@ -449,9 +438,11 @@ if __name__ == '__main__':
 
     palace_images = [cv2.imread('./data/sintra5.JPG'),
                      cv2.imread('./data/sintra4.JPG'),
-                     cv2.imread('./data/sintra3.JPG')]
+                     cv2.imread('./data/sintra3.JPG'),
+                     cv2.imread('./data/sintra2.JPG'),
+                     cv2.imread('./data/sintra1.JPG')]
 
-    scale_percent = 20  # percent of original size
+    scale_percent = 15  # percent of original size
     width = int(palace_images[0].shape[1] * scale_percent / 100)
     height = int(palace_images[0].shape[0] * scale_percent / 100)
     dim = (width, height)
@@ -462,7 +453,13 @@ if __name__ == '__main__':
     SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
     plt.imshow(SIFT_result_palace)
 
-    # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p1_SIFT)
-    # print(H2to1_Ransac_SIFT)
+    # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p2_SIFT)
+    # out_size_ransac, y_down_amount_ransac, x_right_amount_ransac = \
+    #     computeOutSize(im1, im2, H2to1_Ransac_SIFT)
+    # im1_warped_ransac = warpH(im1, H2to1_Ransac_SIFT, out_size_ransac,
+    #                           y_down_amount_ransac, x_right_amount_ransac)
+    # ransac_stitched = imageStitching(im1_warped_ransac, im2,
+    #                                  y_down_amount_ransac, x_right_amount_ransac)
+    # plt.imshow(ransac_stitched)
 
     print("end")
