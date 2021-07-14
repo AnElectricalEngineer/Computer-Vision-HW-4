@@ -93,65 +93,72 @@ def computeOutSize(im1, im2, H2to1):
 
 def createBigPanorama(images, mode='SIFT', use_ransac=True):
     left_side = images[:1 + (len(images) // 2)]
-    right_side = images[1 + (len(images) // 2):]
+    right_side = images[(len(images) // 2):]
     current_result_left = left_side[0]
-    current_result_right = right_side[0]
+    current_result_right = right_side[-1]
 
-    if mode == 'SIFT':
-
-        # Stitch left side
-        for i, image in enumerate(left_side[1:]):
-            p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_left, image)
-            if use_ransac == True:
-                H_SIFT_2to1 = ransacH(p1_SIFT, p2_SIFT)
-            else:
-                H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
-            out_size, y_down_amount, x_right_amount = \
-                computeOutSize(current_result_left, image, H_SIFT_2to1)
-            warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
-                                    y_down_amount, x_right_amount,
-                                    interpolation_type='linear')
-            current_result_left = imageStitching(warped_im1_SIFT, image,
-                                                 y_down_amount, x_right_amount)
-
-        # Stitch right side
-        for i, image in enumerate(right_side[1:]):
-            p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_right, image)
-            if use_ransac == True:
-                H_SIFT_2to1 = ransacH(p1_SIFT, p2_SIFT)
-            else:
-                H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
-            out_size, y_down_amount, x_right_amount = \
-                computeOutSize(current_result_right, image, H_SIFT_2to1)
-            warped_im1_SIFT = warpH(current_result_right, H_SIFT_2to1, out_size,
-                                    y_down_amount, x_right_amount,
-                                    interpolation_type='linear')
-            current_result_right = imageStitching(warped_im1_SIFT, image,
-                                                  y_down_amount, x_right_amount)
-
-        # Stitch left and right results to one large panorama
-        p1_SIFT, p2_SIFT = getPoints_SIFT(current_result_left,
-                                          current_result_right)
-        if use_ransac == True:
-            H_SIFT_2to1 = ransacH(p1_SIFT, p2_SIFT)
+    # Stitch left side
+    for i, image in enumerate(left_side[1:]):
+        if mode == 'SIFT':
+            p1, p2 = getPoints_SIFT(current_result_left, image)
         else:
-            H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+            p1, p2 = getPoints(current_result_left, image, 6, True)
+        if use_ransac == True:
+            H_SIFT_2to1 = ransacH(p1, p2)
+        else:
+            H_SIFT_2to1 = computeH(p1[:, :], p2[:, :])
         out_size, y_down_amount, x_right_amount = \
-            computeOutSize(current_result_left, current_result_right,
-                           H_SIFT_2to1)
+            computeOutSize(current_result_left, image, H_SIFT_2to1)
         warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
                                 y_down_amount, x_right_amount,
                                 interpolation_type='linear')
-        final_result = imageStitching(warped_im1_SIFT, current_result_right,
-                                      y_down_amount, x_right_amount)
-        return final_result
+        current_result_left = imageStitching(warped_im1_SIFT, image,
+                                             y_down_amount, x_right_amount)
+    # Stitch right side
+    for i, image in enumerate(reversed(right_side[:-1])):
+        if mode == 'SIFT':
+            p1, p2 = getPoints_SIFT(current_result_right, image)
+        else:
+            p1, p2 = getPoints(current_result_right, image, 6, True)
+        if use_ransac == True:
+            H_SIFT_2to1 = ransacH(p1, p2)
+        else:
+            H_SIFT_2to1 = computeH(p1[:, :], p2[:, :])
+        out_size, y_down_amount, x_right_amount = \
+            computeOutSize(current_result_right, image, H_SIFT_2to1)
+        warped_im1_SIFT = warpH(current_result_right, H_SIFT_2to1, out_size,
+                                y_down_amount, x_right_amount,
+                                interpolation_type='linear')
+        current_result_right = imageStitching(warped_im1_SIFT, image,
+                                              y_down_amount, x_right_amount)
+
+    # Stitch left and right results to one large panorama
+    if mode == 'SIFT':
+        p1, p2 = getPoints_SIFT(current_result_left, current_result_right)
+    else:
+        p1, p2 = getPoints(current_result_left, current_result_right, 6, True)
+    if use_ransac == True:
+        H_SIFT_2to1 = ransacH(p1, p2)
+    else:
+        H_SIFT_2to1 = computeH(p1[:, :], p2[:, :])
+    out_size, y_down_amount, x_right_amount = \
+        computeOutSize(current_result_left, current_result_right,
+                       H_SIFT_2to1)
+    warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
+                            y_down_amount, x_right_amount,
+                            interpolation_type='linear')
+    final_result = imageStitching(warped_im1_SIFT, current_result_right,
+                                  y_down_amount, x_right_amount)
+    return final_result
 
 
 # Extra functions end
 
 # HW functions:
 
-def getPoints(im1, im2, N):
+def getPoints(im1, im2, N, create_new_fig=False):
+    if create_new_fig:
+        fig1, axes1 = plt.subplots(1, 2)
     axes1[0].imshow(im1)
     axes1[1].imshow(im2)
     axes1[0].set_xticks([])
@@ -313,7 +320,7 @@ def ransacH(p1, p2, nIter=250, tol=3):
             best_inliers_indices = np.where(norms < tol ** 2)
 
     bestH = computeH(p1[:, best_inliers_indices].squeeze(), p2[:,
-                           best_inliers_indices].squeeze())
+                                                            best_inliers_indices].squeeze())
     return bestH
 
 
@@ -351,9 +358,269 @@ def Q1Two():
 
 # Question 1.3
 def Q1Three():
-    warped_im1 = warpH(im1, H2to1, out_size, y_down_amount, x_right_amount,
-                       interpolation_type='linear')
-    return warped_im1
+    # These points are good pairs
+    p1 = np.array([[454.5436828, 511.94919355, 602.95793011, 623.95994624,
+                    640.76155914, 612.75887097], [110.43200202, 111.83213642,
+                                                  484.26788911, 481.4676203,
+                                                  482.8677547, 197.24033535]])
+    p2 = np.array([[118.05591398, 185.7, 294.24516129, 316.2688172,
+                    335.14623656, 294.24516129],
+                   [151.48032796, 154.62656452, 536.89430645, 535.32118817,
+                    532.17495161, 244.29430645]])
+
+    H2to1 = computeH(p1, p2)
+    out_size, y_down_amount, x_right_amount = computeOutSize(im1, im2, H2to1)
+
+    # Linear interpolation
+    warped_im1_linear = warpH(im1, H2to1, out_size, y_down_amount,
+                              x_right_amount,
+                              interpolation_type='linear')
+    fig2, axes2 = plt.subplots(1, 1)
+    axes2.imshow(warped_im1_linear)
+    axes2.set_xticks([])
+    axes2.set_yticks([])
+    fig2.suptitle('Section 1.3 - Incline_L image warped using linear '
+                  'interpolation')
+    plt.savefig("./../output/Section 1.3 - Incline_L image warped using "
+                "linear interpolation.png")
+
+    # Cubic interpolation
+    warped_im1_cubic = warpH(im1, H2to1, out_size, y_down_amount,
+                             x_right_amount,
+                             interpolation_type='cubic')
+    fig3, axes3 = plt.subplots(1, 1)
+    axes3.imshow(warped_im1_cubic)
+    axes3.set_xticks([])
+    axes3.set_yticks([])
+    fig3.suptitle('Section 1.3 - Incline_L image warped using cubic '
+                  'interpolation')
+    plt.savefig("./../output/Section 1.3 - Incline_L image warped using "
+                "cubic interpolation.png")
+
+
+def Q1Four():
+    p1 = np.array([[454.5436828, 511.94919355, 602.95793011, 623.95994624,
+                    640.76155914, 612.75887097], [110.43200202, 111.83213642,
+                                                  484.26788911, 481.4676203,
+                                                  482.8677547, 197.24033535]])
+    p2 = np.array([[118.05591398, 185.7, 294.24516129, 316.2688172,
+                    335.14623656, 294.24516129],
+                   [151.48032796, 154.62656452, 536.89430645, 535.32118817,
+                    532.17495161, 244.29430645]])
+
+    H2to1 = computeH(p1, p2)
+    out_size, y_down_amount, x_right_amount = computeOutSize(im1, im2, H2to1)
+    warped_im1_linear = warpH(im1, H2to1, out_size, y_down_amount,
+                              x_right_amount,
+                              interpolation_type='linear')
+    stitched_image = imageStitching(warped_im1_linear, im2, y_down_amount,
+                                    x_right_amount)
+
+    fig, axes = plt.subplots(1, 1)
+    axes.imshow(stitched_image)
+    axes.set_xticks([])
+    axes.set_yticks([])
+    fig.suptitle('Section 1.4 - Stitched Incline_L and Incline_R images')
+    plt.savefig("./../output/Section 1.4 - Stitched Incline_L and Incline_R "
+                "images.png")
+
+
+def Q1Five():
+    p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
+
+    # Compute H based on 10 best SIFT features
+    H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
+    out_size_im_1_sift_warped, y_down_amount, x_right_amount = computeOutSize(
+        im1, im2, H_SIFT_2to1)
+    warped_im1_SIFT = warpH(im1, H_SIFT_2to1, out_size_im_1_sift_warped,
+                            y_down_amount, x_right_amount,
+                            interpolation_type='linear')
+    stitched_image_SIFT = imageStitching(warped_im1_SIFT, im2, y_down_amount,
+                                         x_right_amount)
+    fig, axes = plt.subplots(1, 1)
+    axes.imshow(stitched_image_SIFT)
+    axes.set_xticks([])
+    axes.set_yticks([])
+    fig.suptitle('Section 1.5 - Stitched Incline Images using SIFT')
+    plt.savefig("./../output/Section 1.5 - Stitched Incline Images using "
+                "SIFT.png")
+
+
+def Q1Six():
+    # Load beach images
+    beach_images = [
+        cv2.cvtColor(cv2.imread('./data/beach1.jpg'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/beach2.jpg'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/beach3.jpg'), cv2.COLOR_BGR2RGB)]
+        # cv2.cvtColor(cv2.imread('./data/beach4.jpg'), cv2.COLOR_BGR2RGB),
+        # cv2.cvtColor(cv2.imread('./data/beach5.jpg'), cv2.COLOR_BGR2RGB)]
+
+    scale_percent = 30  # percent of original size
+    width = int(beach_images[0].shape[1] * scale_percent / 100)
+    height = int(beach_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    # Resize the images due to time constraints
+    beach_images = [cv2.resize(img, dim) for img in beach_images]
+    beach_images = [cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) for img in
+                    beach_images]
+    # manual_stitch_beach = createBigPanorama(beach_images, mode='MANUAL',
+    #                                         use_ransac=False)
+    # manual_stitch_beach = cv2.rotate(manual_stitch_beach,
+    #                                  cv2.ROTATE_90_COUNTERCLOCKWISE)
+    # manual_stitch_beach = cv2.cvtColor(manual_stitch_beach, cv2.COLOR_BGR2RGB)
+
+    # SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
+    #                                       use_ransac=False)
+    # SIFT_stitch_beach = cv2.rotate(SIFT_stitch_beach,
+    #                                cv2.ROTATE_90_COUNTERCLOCKWISE)
+    # SIFT_stitch_beach = cv2.cvtColor(SIFT_stitch_beach, cv2.COLOR_BGR2RGB)
+
+    # Load palace images in opposite order
+    palace_images = [
+        cv2.cvtColor(cv2.imread('./data/sintra5.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra4.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra3.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra2.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra1.JPG'), cv2.COLOR_BGR2RGB)]
+
+    scale_percent = 20  # percent of original size
+    width = int(palace_images[0].shape[1] * scale_percent / 100)
+    height = int(palace_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    # Resize the images due to time constraints
+    palace_images = [cv2.resize(img, dim) for img in palace_images]
+
+    # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
+    #                                          use_ransac=False)
+    # manual_stitch_palace = cv2.cvtColor(manual_stitch_palace, cv2.COLOR_BGR2RGB)
+
+    SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
+                                           use_ransac=False)
+    SIFT_stitch_palace = cv2.cvtColor(SIFT_stitch_palace, cv2.COLOR_BGR2RGB)
+
+    # fig1, axes1 = plt.subplots(1, 1)
+    # axes1.imshow(manual_stitch_beach)
+    # axes1.set_xticks([])
+    # axes1.set_yticks([])
+    # fig1.suptitle('Section 1.6 - Stitched Beach Images Using Manually '
+    #               'Selected Points')
+    # plt.savefig("./../output/Section 1.6 - Stitched Beach Images Using "
+    #             "Manually Selected Points.png")
+
+    # fig2, axes2 = plt.subplots(1, 1)
+    # axes2.imshow(SIFT_stitch_beach)
+    # axes2.set_xticks([])
+    # axes2.set_yticks([])
+    # fig2.suptitle('Section 1.6 - Stitched Beach Images Using SIFT')
+    # plt.savefig("./../output/Section 1.6 - Stitched Beach Images Using "
+    #             "SIFT.png")
+
+    # fig3, axes3 = plt.subplots(1, 1)
+    # axes3.imshow(manual_stitch_palace)
+    # axes3.set_xticks([])
+    # axes3.set_yticks([])
+    # fig3.suptitle('Section 1.6 - Stitched Palace Images Using Manually '
+    #               'Selected Points')
+    # plt.savefig("./../output/Section 1.6 - Stitched Palace Images Using "
+    #             "Manually Selected Points.png")
+
+    fig4, axes4 = plt.subplots(1, 1)
+    axes4.imshow(SIFT_stitch_palace)
+    axes4.set_xticks([])
+    axes4.set_yticks([])
+    fig4.suptitle('Section 1.6 - Stitched Palace Images Using SIFT')
+    plt.savefig("./../output/Section 1.6 - Stitched Palace Images Using "
+                "SIFT.png")
+
+def Q1Seven():
+    # Load beach images
+    beach_images = [
+        cv2.cvtColor(cv2.imread('./data/beach1.jpg'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/beach2.jpg'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/beach3.jpg'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/beach4.jpg'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/beach5.jpg'), cv2.COLOR_BGR2RGB)]
+
+    scale_percent = 18  # percent of original size
+    width = int(beach_images[0].shape[1] * scale_percent / 100)
+    height = int(beach_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    # Resize the images due to time constraints
+    beach_images = [cv2.resize(img, dim) for img in beach_images]
+    beach_images = [cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) for img in
+                    beach_images]
+    # manual_stitch_beach = createBigPanorama(beach_images, mode='MANUAL',
+    #                                         use_ransac=True)
+    # manual_stitch_beach = cv2.rotate(manual_stitch_beach,
+    #                                  cv2.ROTATE_90_COUNTERCLOCKWISE)
+    # manual_stitch_beach = cv2.cvtColor(manual_stitch_beach, cv2.COLOR_BGR2RGB)
+    #
+    # SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
+    #                                       use_ransac=True)
+    # SIFT_stitch_beach = cv2.rotate(SIFT_stitch_beach,
+    #                                cv2.ROTATE_90_COUNTERCLOCKWISE)
+    # SIFT_stitch_beach = cv2.cvtColor(SIFT_stitch_beach, cv2.COLOR_BGR2RGB)
+
+    # # Load palace images in opposite order
+    palace_images = [
+        cv2.cvtColor(cv2.imread('./data/sintra5.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra4.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra3.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra2.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra1.JPG'), cv2.COLOR_BGR2RGB)]
+
+    scale_percent = 10  # percent of original size
+    width = int(palace_images[0].shape[1] * scale_percent / 100)
+    height = int(palace_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
+
+    # # Resize the images due to time constraints
+    palace_images = [cv2.resize(img, dim) for img in palace_images]
+
+    # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
+    #                                          use_ransac=True)
+    # manual_stitch_palace = cv2.cvtColor(manual_stitch_palace, cv2.COLOR_BGR2RGB)
+
+    SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
+                                           use_ransac=True)
+    SIFT_stitch_palace = cv2.cvtColor(SIFT_stitch_palace, cv2.COLOR_BGR2RGB)
+
+    # fig1, axes1 = plt.subplots(1, 1)
+    # axes1.imshow(manual_stitch_beach)
+    # axes1.set_xticks([])
+    # axes1.set_yticks([])
+    # fig1.suptitle('Section 1.7 - Stitched Beach Images Using Manually '
+    #               'Selected Points and RANSAC')
+    # plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
+    #             "Manually Selected Points and RANSAC.png")
+    #
+    # fig2, axes2 = plt.subplots(1, 1)
+    # axes2.imshow(SIFT_stitch_beach)
+    # axes2.set_xticks([])
+    # axes2.set_yticks([])
+    # fig2.suptitle('Section 1.7 - Stitched Beach Images Using SIFT and RANSAC')
+    # plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
+    #             "SIFT and RANSAC.png")
+
+    # fig3, axes3 = plt.subplots(1, 1)
+    # axes3.imshow(manual_stitch_palace)
+    # axes3.set_xticks([])
+    # axes3.set_yticks([])
+    # fig3.suptitle('Section 1.7 - Stitched Palace Images Using Manually '
+    #               'Selected Points and RANSAC')
+    # plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
+    #             "Manually Selected Points and RANSAC.png")
+
+    fig4, axes4 = plt.subplots(1, 1)
+    axes4.imshow(SIFT_stitch_palace)
+    axes4.set_xticks([])
+    axes4.set_yticks([])
+    fig4.suptitle('Section 1.7 - Stitched Palace Images Using SIFT and RANSAC')
+    plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
+                "SIFT and RANSAC.png")
 
 
 ################################################################################
@@ -364,94 +631,13 @@ if __name__ == '__main__':
     im2 = cv2.imread('data/incline_R.png')
     im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
 
-    # fig1, axes1 = plt.subplots(1, 2)
+    fig1, axes1 = plt.subplots(1, 2)  # Figure for Q1.2
     # Q1Two()
-
-    # p1 = np.array([[454.5436828, 511.94919355, 602.95793011, 623.95994624,
-    #                 640.76155914, 612.75887097], [110.43200202, 111.83213642,
-    #                                               484.26788911, 481.4676203,
-    #                                               482.8677547, 197.24033535]])
-    # p2 = np.array([[118.05591398, 185.7, 294.24516129, 316.2688172,
-    #                 335.14623656, 294.24516129],
-    #                [151.48032796, 154.62656452, 536.89430645, 535.32118817,
-    #                 532.17495161, 244.29430645]])
-
-    # p1 = np.array(
-    #     [[517.60420168, 703.15042017, 603.11680672, 520.83109244, 541.80588235,
-    #       627.31848739, 383.68823529],
-    #      [450.61932773, 516.77058824, 502.24957983, 171.49327731, 126.31680672,
-    #       255.39243697, 182.78739496]])
-    # p2 = np.array(
-    #     [[202.98235294, 394.98235294, 296.56218487, 198.14201681, 220.7302521,
-    #       311.08319328, 40.02436975],
-    #      [508.05798319, 559.68823529, 558.07478992, 220.86470588, 172.46134454,
-    #       306.37731092, 228.93193277]])
-    #
-    # H2to1 = computeH(p1, p2)
-    # out_size, y_down_amount, x_right_amount = computeOutSize(im1, im2, H2to1)
-
-    # warped_im1 = Q1Three()
-    # np.save('./../temp/warped_im1', warped_im1)
-    # plt.imshow(warped_im1)
-
-    # warped_im1_aligned = np.load('./../temp/warped_im1.npy')
-    #
-    # stitched_image = imageStitching(warped_im1_aligned, im2, y_down_amount,
-    #                                 x_right_amount)
-    # plt.imshow(stitched_image)
-
-    # p1_SIFT, p2_SIFT = getPoints_SIFT(im1, im2)
-    # H_SIFT_2to1 = computeH(p1_SIFT[:, :10], p2_SIFT[:, :10])
-    # out_size_im_1_sift_warped = computeOutSize(im1, H_SIFT_2to1)
-    # warped_im1_SIFT = warpH(im1, H_SIFT_2to1, out_size_im_1_sift_warped,
-    #                         interpolation_type='linear')
-    # np.save('./../temp/warped_im1_SIFT', warped_im1_SIFT)
-
-    # warped_im1_SIFT = np.load('./../temp/warped_im1_SIFT.npy')
-    # plt.imshow(warped_im1_SIFT)
-
-    # warped_im1_SIFT_aligned = alignImage(im1, im2, warped_im1_SIFT,
-    #                                      H_SIFT_2to1, True)
-    # im2_aligned = alignImage(im1, im2, warped_im1_SIFT, H_SIFT_2to1, False)
-
-    # plt.imshow(warped_im1_SIFT_aligned)
-    # stitched_image_SIFT = imageStitching(im2_aligned, warped_im1_SIFT_aligned)
-    # plt.imshow(stitched_image_SIFT)
-
-    # beach_images = [cv2.imread('./data/beach1.jpg'),
-    #                 cv2.imread('./data/beach2.jpg'),
-    #                 cv2.imread('./data/beach3.jpg'),
-    #                 cv2.imread('./data/beach4.jpg')]
-    #
-    # scale_percent = 30  # percent of original size
-    # width = int(beach_images[0].shape[1] * scale_percent / 100)
-    # height = int(beach_images[0].shape[0] * scale_percent / 100)
-    # dim = (width, height)
-    #
-    # beach_images = [cv2.resize(img, dim) for img in beach_images]
-    # beach_images = [cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) for img in
-    #                 beach_images]
-    #
-    # SIFT_result = createBigPanorama(beach_images)
-    # SIFT_result = cv2.cvtColor(SIFT_result, cv2.COLOR_BGR2RGB)
-    # plt.imshow(SIFT_result)
-
-    palace_images = [cv2.imread('./data/sintra5.JPG'),
-                     cv2.imread('./data/sintra4.JPG'),
-                     cv2.imread('./data/sintra3.JPG'),
-                     cv2.imread('./data/sintra2.JPG'),
-                     cv2.imread('./data/sintra1.JPG')]
-
-    scale_percent = 15  # percent of original size
-    width = int(palace_images[0].shape[1] * scale_percent / 100)
-    height = int(palace_images[0].shape[0] * scale_percent / 100)
-    dim = (width, height)
-
-    palace_images = [cv2.resize(img, dim) for img in palace_images]
-
-    SIFT_result_palace = createBigPanorama(palace_images)
-    SIFT_result_palace = cv2.cvtColor(SIFT_result_palace, cv2.COLOR_BGR2RGB)
-    plt.imshow(SIFT_result_palace)
+    # Q1Three()
+    # Q1Four()
+    # Q1Five()
+    # Q1Six()
+    Q1Seven()
 
     # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p2_SIFT)
     # out_size_ransac, y_down_amount_ransac, x_right_amount_ransac = \
