@@ -468,13 +468,11 @@ def Q1Six():
     #                                         use_ransac=False)
     # manual_stitch_beach = cv2.rotate(manual_stitch_beach,
     #                                  cv2.ROTATE_90_COUNTERCLOCKWISE)
-    # manual_stitch_beach = cv2.cvtColor(manual_stitch_beach, cv2.COLOR_BGR2RGB)
 
     # SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
     #                                       use_ransac=False)
     # SIFT_stitch_beach = cv2.rotate(SIFT_stitch_beach,
     #                                cv2.ROTATE_90_COUNTERCLOCKWISE)
-    # SIFT_stitch_beach = cv2.cvtColor(SIFT_stitch_beach, cv2.COLOR_BGR2RGB)
 
     # Load palace images in opposite order
     palace_images = [
@@ -494,11 +492,9 @@ def Q1Six():
 
     # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
     #                                          use_ransac=False)
-    # manual_stitch_palace = cv2.cvtColor(manual_stitch_palace, cv2.COLOR_BGR2RGB)
 
     SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
                                            use_ransac=False)
-    SIFT_stitch_palace = cv2.cvtColor(SIFT_stitch_palace, cv2.COLOR_BGR2RGB)
 
     # fig1, axes1 = plt.subplots(1, 1)
     # axes1.imshow(manual_stitch_beach)
@@ -543,7 +539,7 @@ def Q1Seven():
         cv2.cvtColor(cv2.imread('./data/beach4.jpg'), cv2.COLOR_BGR2RGB),
         cv2.cvtColor(cv2.imread('./data/beach5.jpg'), cv2.COLOR_BGR2RGB)]
 
-    scale_percent = 18  # percent of original size
+    scale_percent = 15  # percent of original size
     width = int(beach_images[0].shape[1] * scale_percent / 100)
     height = int(beach_images[0].shape[0] * scale_percent / 100)
     dim = (width, height)
@@ -556,13 +552,11 @@ def Q1Seven():
     #                                         use_ransac=True)
     # manual_stitch_beach = cv2.rotate(manual_stitch_beach,
     #                                  cv2.ROTATE_90_COUNTERCLOCKWISE)
-    # manual_stitch_beach = cv2.cvtColor(manual_stitch_beach, cv2.COLOR_BGR2RGB)
     #
-    # SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
-    #                                       use_ransac=True)
-    # SIFT_stitch_beach = cv2.rotate(SIFT_stitch_beach,
-    #                                cv2.ROTATE_90_COUNTERCLOCKWISE)
-    # SIFT_stitch_beach = cv2.cvtColor(SIFT_stitch_beach, cv2.COLOR_BGR2RGB)
+    SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
+                                          use_ransac=True)
+    SIFT_stitch_beach = cv2.rotate(SIFT_stitch_beach,
+                                   cv2.ROTATE_90_COUNTERCLOCKWISE)
 
     # # Load palace images in opposite order
     palace_images = [
@@ -572,7 +566,7 @@ def Q1Seven():
         cv2.cvtColor(cv2.imread('./data/sintra2.JPG'), cv2.COLOR_BGR2RGB),
         cv2.cvtColor(cv2.imread('./data/sintra1.JPG'), cv2.COLOR_BGR2RGB)]
 
-    scale_percent = 10  # percent of original size
+    scale_percent = 15  # percent of original size
     width = int(palace_images[0].shape[1] * scale_percent / 100)
     height = int(palace_images[0].shape[0] * scale_percent / 100)
     dim = (width, height)
@@ -582,11 +576,9 @@ def Q1Seven():
 
     # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
     #                                          use_ransac=True)
-    # manual_stitch_palace = cv2.cvtColor(manual_stitch_palace, cv2.COLOR_BGR2RGB)
 
-    SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
-                                           use_ransac=True)
-    SIFT_stitch_palace = cv2.cvtColor(SIFT_stitch_palace, cv2.COLOR_BGR2RGB)
+    # SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
+    #                                        use_ransac=True)
 
     # fig1, axes1 = plt.subplots(1, 1)
     # axes1.imshow(manual_stitch_beach)
@@ -597,13 +589,13 @@ def Q1Seven():
     # plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
     #             "Manually Selected Points and RANSAC.png")
     #
-    # fig2, axes2 = plt.subplots(1, 1)
-    # axes2.imshow(SIFT_stitch_beach)
-    # axes2.set_xticks([])
-    # axes2.set_yticks([])
-    # fig2.suptitle('Section 1.7 - Stitched Beach Images Using SIFT and RANSAC')
-    # plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
-    #             "SIFT and RANSAC.png")
+    fig2, axes2 = plt.subplots(1, 1)
+    axes2.imshow(SIFT_stitch_beach)
+    axes2.set_xticks([])
+    axes2.set_yticks([])
+    fig2.suptitle('Section 1.7 - Stitched Beach Images Using SIFT and RANSAC')
+    plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
+                "SIFT and RANSAC.png")
 
     # fig3, axes3 = plt.subplots(1, 1)
     # axes3.imshow(manual_stitch_palace)
@@ -614,13 +606,14 @@ def Q1Seven():
     # plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
     #             "Manually Selected Points and RANSAC.png")
 
-    fig4, axes4 = plt.subplots(1, 1)
-    axes4.imshow(SIFT_stitch_palace)
-    axes4.set_xticks([])
-    axes4.set_yticks([])
-    fig4.suptitle('Section 1.7 - Stitched Palace Images Using SIFT and RANSAC')
-    plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
-                "SIFT and RANSAC.png")
+    # TODO DO NOT Uncomment the block below (until turn in)
+    # fig4, axes4 = plt.subplots(1, 1)
+    # axes4.imshow(SIFT_stitch_palace)
+    # axes4.set_xticks([])
+    # axes4.set_yticks([])
+    # fig4.suptitle('Section 1.7 - Stitched Palace Images Using SIFT and RANSAC')
+    # plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
+    #             "SIFT and RANSAC.png")
 
 
 ################################################################################
@@ -638,14 +631,5 @@ if __name__ == '__main__':
     # Q1Five()
     # Q1Six()
     Q1Seven()
-
-    # H2to1_Ransac_SIFT = ransacH(p1_SIFT, p2_SIFT)
-    # out_size_ransac, y_down_amount_ransac, x_right_amount_ransac = \
-    #     computeOutSize(im1, im2, H2to1_Ransac_SIFT)
-    # im1_warped_ransac = warpH(im1, H2to1_Ransac_SIFT, out_size_ransac,
-    #                           y_down_amount_ransac, x_right_amount_ransac)
-    # ransac_stitched = imageStitching(im1_warped_ransac, im2,
-    #                                  y_down_amount_ransac, x_right_amount_ransac)
-    # plt.imshow(ransac_stitched)
 
     print("end")
