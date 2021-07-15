@@ -5,15 +5,6 @@ import scipy
 from matplotlib import pyplot as plt
 import my_homography as mh
 
-# Add functions here:
-"""
-   Your code here
-"""
-
-# TODO RUN ALL CODE BEFORE TURNING IN - to make sure that all images and
-#  stuff are where they should be
-# Functions end
-
 # HW functions:
 def create_ref(im_path, save_name, do_new_warp=False):
 
@@ -69,18 +60,16 @@ def create_ref(im_path, save_name, do_new_warp=False):
         y_max = int(new_coords[1, 2])
 
         ref_image = ref_image[y_min:y_max, x_min:x_max]
-        np.save(f'./../temp/{save_name}', ref_image)
-    else:
-        ref_image = np.load(f'./../temp/{save_name}.npy')
+        # np.save(f'./../temp/{save_name}', ref_image)
+    # else:
+    #     ref_image = np.load(f'./../temp/{save_name}.npy')
     return ref_image
 
 
 def im2im(ref_im, scene_im_path, do_new_warp=False):
-
+    scene_im = cv2.imread(scene_im_path)
+    scene_im = cv2.cvtColor(scene_im, cv2.COLOR_BGR2RGB)
     if do_new_warp == True:
-        scene_im = cv2.imread(scene_im_path)
-        scene_im = cv2.cvtColor(scene_im, cv2.COLOR_BGR2RGB)
-
         fig1, axes1 = plt.subplots(1, 1)
         axes1.imshow(scene_im)
         axes1.set_xticks([])
@@ -105,9 +94,9 @@ def im2im(ref_im, scene_im_path, do_new_warp=False):
         H2to1 = mh.computeH(rectangle_points, p2)
         ref_im_warped = mh.warpH(ref_im, H2to1, scene_im.shape,
                                  0, 0)
-        np.save('./../temp/ref_image_warped', ref_im_warped)
-    else:
-        ref_im_warped = np.load('./../temp/ref_image_warped.npy')
+        # np.save('./../temp/ref_image_warped', ref_im_warped)
+    # else:
+        # ref_im_warped = np.load('./../temp/ref_image_warped.npy')
 
     ref_im_mask = np.where(ref_im_warped == [0, 0, 0])
     ref_im_warped[ref_im_mask] = scene_im[ref_im_mask]
@@ -138,15 +127,27 @@ if __name__ == '__main__':
                           True)
 
     scene_1 = im2im(ref_im_1, 'my_data/book_scene.jpeg', True)
-    scene_2 = im2im(ref_im_2, 'my_data/book_scene.jpeg', True)
-    scene_3 = im2im(ref_im_3, 'my_data/book_scene.jpeg', True)
-    fig2, axes2 = plt.subplots(1, 3)
-    for i, image in enumerate([scene_1, scene_2, scene_3]):
-        axes2[i].imshow(image)
-        axes2[i].set_xticks([])
-        axes2[i].set_yticks([])
+    fig2, axes2 = plt.subplots(1, 1)
+    axes2.imshow(scene_1)
+    axes2.set_xticks([])
+    axes2.set_yticks([])
+    fig2.suptitle('Section 2.2 - Final result of book stitching - Example 1')
+    plt.savefig("./../output/im2im1.jpg")
 
-    fig2.suptitle('Section 2.2 - Final result of book stitching')
-    plt.savefig("./my_data/Section 2.2 - Final result of book stitching.png")
+    scene_2 = im2im(ref_im_2, 'my_data/book_scene.jpeg', True)
+    fig3, axes3 = plt.subplots(1, 1)
+    axes3.imshow(scene_2)
+    axes3.set_xticks([])
+    axes3.set_yticks([])
+    fig3.suptitle('Section 2.2 - Final result of book stitching - Example 2')
+    plt.savefig("./../output/im2im2.jpg")
+
+    scene_3 = im2im(ref_im_3, 'my_data/book_scene.jpeg', True)
+    fig4, axes4 = plt.subplots(1, 1)
+    axes4.imshow(scene_3)
+    axes4.set_xticks([])
+    axes4.set_yticks([])
+    fig4.suptitle('Section 2.2 - Final result of book stitching - Example 3')
+    plt.savefig("./../output/im2im3.jpg")
 
     print('end')
