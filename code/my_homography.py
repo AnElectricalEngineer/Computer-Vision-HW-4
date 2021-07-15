@@ -107,7 +107,7 @@ def createBigPanorama(images, mode='SIFT', use_ransac=True):
         if use_ransac == True:
             H_SIFT_2to1 = ransacH(p1, p2)
         else:
-            H_SIFT_2to1 = computeH(p1[:, :6], p2[:, :6]) # TODO check
+            H_SIFT_2to1 = computeH(p1[:, :6], p2[:, :6])
         out_size, y_down_amount, x_right_amount = \
             computeOutSize(current_result_left, image, H_SIFT_2to1)
         warped_im1_SIFT = warpH(current_result_left, H_SIFT_2to1, out_size,
@@ -124,7 +124,7 @@ def createBigPanorama(images, mode='SIFT', use_ransac=True):
         if use_ransac == True:
             H_SIFT_2to1 = ransacH(p1, p2)
         else:
-            H_SIFT_2to1 = computeH(p1[:, :6], p2[:, :6]) # TODO check
+            H_SIFT_2to1 = computeH(p1[:, :6], p2[:, :6])
         out_size, y_down_amount, x_right_amount = \
             computeOutSize(current_result_right, image, H_SIFT_2to1)
         warped_im1_SIFT = warpH(current_result_right, H_SIFT_2to1, out_size,
@@ -141,7 +141,7 @@ def createBigPanorama(images, mode='SIFT', use_ransac=True):
     if use_ransac == True:
         H_SIFT_2to1 = ransacH(p1, p2)
     else:
-        H_SIFT_2to1 = computeH(p1[:, :6], p2[:, :6]) # TODO check
+        H_SIFT_2to1 = computeH(p1[:, :6], p2[:, :6])
     out_size, y_down_amount, x_right_amount = \
         computeOutSize(current_result_left, current_result_right,
                        H_SIFT_2to1)
@@ -223,7 +223,6 @@ def computeH(p1, p2):
     A[1::2, 8] = -v_i  # put -v_i in the 9th column of all the odd rows of A
 
     _lambda, V = np.linalg.eig(A.T @ A)
-    # TODO maybe change to np.abs(_lambda).argmin()
     indexOfSmallestLambda = np.argmin(_lambda)
     H2to1 = V[:, indexOfSmallestLambda].reshape((3, 3))
 
@@ -463,26 +462,26 @@ def Q1Six():
 
     # Resize the images due to time constraints
     beach_images = [cv2.resize(img, dim) for img in beach_images]
-    # TODO don't uncomment until time to turn in
-    # start_Manual_stitch_beach_time = time.time()
-    # print(f"Q1.6 - Starting panorama creation of Beach images using Manual "
-    #       f"mode and no RANSAC, with scale factor of {scale_percent}")
-    # manual_stitch_beach = createBigPanorama(beach_images, mode='MANUAL',
-    #                                         use_ransac=False)
-    # end_Manual_stitch_beach_time = time.time()
-    # print(f"Q1.6 - Panorama creation of Beach images using Manual mode and "
-    #       f"no RANSAC with with scale factor of {scale_percent} took "
-    #       f"{end_Manual_stitch_beach_time - start_Manual_stitch_beach_time} "
-    #       f"seconds to complete")
 
-    # fig1, axes1 = plt.subplots(1, 1)
-    # axes1.imshow(manual_stitch_beach)
-    # axes1.set_xticks([])
-    # axes1.set_yticks([])
-    # fig1.suptitle('Section 1.6 - Stitched Beach Images Using Manually '
-    #               'Selected Points')
-    # plt.savefig("./../output/Section 1.6 - Stitched Beach Images Using "
-    #             "Manually Selected Points.png")
+    start_Manual_stitch_beach_time = time.time()
+    print(f"Q1.6 - Starting panorama creation of Beach images using Manual "
+          f"mode and no RANSAC, with scale factor of {scale_percent}")
+    manual_stitch_beach = createBigPanorama(beach_images, mode='MANUAL',
+                                            use_ransac=False)
+    end_Manual_stitch_beach_time = time.time()
+    print(f"Q1.6 - Panorama creation of Beach images using Manual mode and "
+          f"no RANSAC with with scale factor of {scale_percent} took "
+          f"{end_Manual_stitch_beach_time - start_Manual_stitch_beach_time} "
+          f"seconds to complete")
+
+    fig1, axes1 = plt.subplots(1, 1)
+    axes1.imshow(manual_stitch_beach)
+    axes1.set_xticks([])
+    axes1.set_yticks([])
+    fig1.suptitle('Section 1.6 - Stitched Beach Images Using Manually '
+                  'Selected Points')
+    plt.savefig("./../output/Section 1.6 - Stitched Beach Images Using "
+                "Manually Selected Points.png")
 
     start_SIFT_stitch_beach_time = time.time()
     print(f"Q1.6 - Starting panorama creation of Beach images using SIFT and "
@@ -519,44 +518,44 @@ def Q1Six():
     # Resize the images due to time constraints
     palace_images = [cv2.resize(img, dim) for img in palace_images]
 
-    # start_Manual_stitch_palace_time = time.time()
-    # print(f"Q1.6 - Starting panorama creation of Palace images using Manual "
-    #       f"mode and no RANSAC, with scale factor of {scale_percent}")
-    # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
-    #                                          use_ransac=False)
-    # end_Manual_stitch_palace_time = time.time()
-    # print(f"Q1.6 - Panorama creation of Palace images using Manual mode and "
-    #       f"no RANSAC with with scale factor of {scale_percent} took "
-    #       f"{end_Manual_stitch_palace_time - start_Manual_stitch_palace_time} "
-    #       f"seconds to complete")
-    #
-    # fig3, axes3 = plt.subplots(1, 1)
-    # axes3.imshow(manual_stitch_palace)
-    # axes3.set_xticks([])
-    # axes3.set_yticks([])
-    # fig3.suptitle('Section 1.6 - Stitched Palace Images Using Manually '
-    #               'Selected Points')
-    # plt.savefig("./../output/Section 1.6 - Stitched Palace Images Using "
-    #             "Manually Selected Points.png")
+    start_Manual_stitch_palace_time = time.time()
+    print(f"Q1.6 - Starting panorama creation of Palace images using Manual "
+          f"mode and no RANSAC, with scale factor of {scale_percent}")
+    manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
+                                             use_ransac=False)
+    end_Manual_stitch_palace_time = time.time()
+    print(f"Q1.6 - Panorama creation of Palace images using Manual mode and "
+          f"no RANSAC with with scale factor of {scale_percent} took "
+          f"{end_Manual_stitch_palace_time - start_Manual_stitch_palace_time} "
+          f"seconds to complete")
 
-    # start_SIFT_stitch_palace_time = time.time()
-    # print(f"Q1.6 - Starting panorama creation of Palace images using SIFT and "
-    #       f"no RANSAC, with scale factor of {scale_percent}")
-    # SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
-    #                                        use_ransac=False)
-    # end_SIFT_stitch_palace_time = time.time()
-    # print(f"Q1.6 - Panorama creation of Palace images using SIFT and no RANSAC "
-    #       f"with with scale factor of {scale_percent} took "
-    #       f"{end_SIFT_stitch_palace_time - start_SIFT_stitch_palace_time} "
-    #       f"seconds to complete")
-    #
-    # fig4, axes4 = plt.subplots(1, 1)
-    # axes4.imshow(SIFT_stitch_palace)
-    # axes4.set_xticks([])
-    # axes4.set_yticks([])
-    # fig4.suptitle('Section 1.6 - Stitched Palace Images Using SIFT')
-    # plt.savefig("./../output/Section 1.6 - Stitched Palace Images Using "
-    #             "SIFT.png")
+    fig3, axes3 = plt.subplots(1, 1)
+    axes3.imshow(manual_stitch_palace)
+    axes3.set_xticks([])
+    axes3.set_yticks([])
+    fig3.suptitle('Section 1.6 - Stitched Palace Images Using Manually '
+                  'Selected Points')
+    plt.savefig("./../output/Section 1.6 - Stitched Palace Images Using "
+                "Manually Selected Points.png")
+
+    start_SIFT_stitch_palace_time = time.time()
+    print(f"Q1.6 - Starting panorama creation of Palace images using SIFT and "
+          f"no RANSAC, with scale factor of {scale_percent}")
+    SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
+                                           use_ransac=False)
+    end_SIFT_stitch_palace_time = time.time()
+    print(f"Q1.6 - Panorama creation of Palace images using SIFT and no RANSAC "
+          f"with with scale factor of {scale_percent} took "
+          f"{end_SIFT_stitch_palace_time - start_SIFT_stitch_palace_time} "
+          f"seconds to complete")
+
+    fig4, axes4 = plt.subplots(1, 1)
+    axes4.imshow(SIFT_stitch_palace)
+    axes4.set_xticks([])
+    axes4.set_yticks([])
+    fig4.suptitle('Section 1.6 - Stitched Palace Images Using SIFT')
+    plt.savefig("./../output/Section 1.6 - Stitched Palace Images Using "
+                "SIFT.png")
 
 
 def Q1Seven():
@@ -595,81 +594,79 @@ def Q1Seven():
     plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
                 "Manually Selected Points and RANSAC.png")
 
-    # start_SIFT_stitch_beach_time = time.time()
-    # print(f"Q1.7 - Starting panorama creation of Beach images using SIFT and "
-    #       f"RANSAC, with scale factor of {scale_percent}")
-    # SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
-    #                                       use_ransac=True)
-    # end_SIFT_stitch_beach_time = time.time()
-    # print(f"Q1.7 - Panorama creation of Beach images using SIFT and RANSAC "
-    #       f"with with scale factor of {scale_percent} took "
-    #       f"{end_SIFT_stitch_beach_time - start_SIFT_stitch_beach_time} "
-    #       f"seconds to complete")
-    #
-    # fig2, axes2 = plt.subplots(1, 1)
-    # axes2.imshow(SIFT_stitch_beach)
-    # axes2.set_xticks([])
-    # axes2.set_yticks([])
-    # fig2.suptitle('Section 1.7 - Stitched Beach Images Using SIFT and RANSAC')
-    # plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
-    #             "SIFT and RANSAC.png")
+    start_SIFT_stitch_beach_time = time.time()
+    print(f"Q1.7 - Starting panorama creation of Beach images using SIFT and "
+          f"RANSAC, with scale factor of {scale_percent}")
+    SIFT_stitch_beach = createBigPanorama(beach_images, mode='SIFT',
+                                          use_ransac=True)
+    end_SIFT_stitch_beach_time = time.time()
+    print(f"Q1.7 - Panorama creation of Beach images using SIFT and RANSAC "
+          f"with with scale factor of {scale_percent} took "
+          f"{end_SIFT_stitch_beach_time - start_SIFT_stitch_beach_time} "
+          f"seconds to complete")
+
+    fig2, axes2 = plt.subplots(1, 1)
+    axes2.imshow(SIFT_stitch_beach)
+    axes2.set_xticks([])
+    axes2.set_yticks([])
+    fig2.suptitle('Section 1.7 - Stitched Beach Images Using SIFT and RANSAC')
+    plt.savefig("./../output/Section 1.7 - Stitched Beach Images Using "
+                "SIFT and RANSAC.png")
 
     # Load palace images in opposite order
-    # palace_images = [
-    #     cv2.cvtColor(cv2.imread('./data/sintra5.JPG'), cv2.COLOR_BGR2RGB),
-    #     cv2.cvtColor(cv2.imread('./data/sintra4.JPG'), cv2.COLOR_BGR2RGB),
-    #     cv2.cvtColor(cv2.imread('./data/sintra3.JPG'), cv2.COLOR_BGR2RGB),
-    #     cv2.cvtColor(cv2.imread('./data/sintra2.JPG'), cv2.COLOR_BGR2RGB),
-    #     cv2.cvtColor(cv2.imread('./data/sintra1.JPG'), cv2.COLOR_BGR2RGB)]
-    #
-    # scale_percent = 15  # percent of original size
-    # width = int(palace_images[0].shape[1] * scale_percent / 100)
-    # height = int(palace_images[0].shape[0] * scale_percent / 100)
-    # dim = (width, height)
-    #
-    # # Resize the images due to time constraints
-    # palace_images = [cv2.resize(img, dim) for img in palace_images]
+    palace_images = [
+        cv2.cvtColor(cv2.imread('./data/sintra5.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra4.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra3.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra2.JPG'), cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(cv2.imread('./data/sintra1.JPG'), cv2.COLOR_BGR2RGB)]
 
-    # TODO DO NOT Uncomment the block below (until turn in)
-    # start_Manual_stitch_palace_time = time.time()
-    # print(f"Q1.7 - Starting panorama creation of Palace images using Manual "
-    #       f"mode and RANSAC, with scale factor of {scale_percent}")
-    # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
-    #                                          use_ransac=True)
-    # end_Manual_stitch_palace_time = time.time()
-    # print(f"Q1.7 - Panorama creation of Palace images using Manual mode and "
-    #       f"RANSAC with with scale factor of {scale_percent} took "
-    #       f"{end_Manual_stitch_palace_time - start_Manual_stitch_palace_time} "
-    #       f"seconds to complete")
+    scale_percent = 15  # percent of original size
+    width = int(palace_images[0].shape[1] * scale_percent / 100)
+    height = int(palace_images[0].shape[0] * scale_percent / 100)
+    dim = (width, height)
 
-    # fig3, axes3 = plt.subplots(1, 1)
-    # axes3.imshow(manual_stitch_palace)
-    # axes3.set_xticks([])
-    # axes3.set_yticks([])
-    # fig3.suptitle('Section 1.7 - Stitched Palace Images Using Manually '
-    #               'Selected Points and RANSAC')
-    # plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
-    #             "Manually Selected Points and RANSAC.png")
+    # Resize the images due to time constraints
+    palace_images = [cv2.resize(img, dim) for img in palace_images]
 
-    # TODO DO NOT Uncomment the block below (until turn in)
-    # start_SIFT_stitch_palace_time = time.time()
-    # print(f"Q1.7 - Starting panorama creation of Palace images using SIFT and "
-    #       f"RANSAC, with scale factor of {scale_percent}")
-    # SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
-    #                                        use_ransac=True)
-    # end_SIFT_stitch_palace_time = time.time()
-    # print(f"Q1.7 - Panorama creation of Palace images using SIFT and RANSAC "
-    #       f"with with scale factor of {scale_percent} took "
-    #       f"{end_SIFT_stitch_palace_time - start_SIFT_stitch_palace_time} "
-    #       f"seconds to complete")
+    start_Manual_stitch_palace_time = time.time()
+    print(f"Q1.7 - Starting panorama creation of Palace images using Manual "
+          f"mode and RANSAC, with scale factor of {scale_percent}")
+    manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
+                                             use_ransac=True)
+    end_Manual_stitch_palace_time = time.time()
+    print(f"Q1.7 - Panorama creation of Palace images using Manual mode and "
+          f"RANSAC with with scale factor of {scale_percent} took "
+          f"{end_Manual_stitch_palace_time - start_Manual_stitch_palace_time} "
+          f"seconds to complete")
 
-    # fig4, axes4 = plt.subplots(1, 1)
-    # axes4.imshow(SIFT_stitch_palace)
-    # axes4.set_xticks([])
-    # axes4.set_yticks([])
-    # fig4.suptitle('Section 1.7 - Stitched Palace Images Using SIFT and RANSAC')
-    # plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
-    #             "SIFT and RANSAC.png")
+    fig3, axes3 = plt.subplots(1, 1)
+    axes3.imshow(manual_stitch_palace)
+    axes3.set_xticks([])
+    axes3.set_yticks([])
+    fig3.suptitle('Section 1.7 - Stitched Palace Images Using Manually '
+                  'Selected Points and RANSAC')
+    plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
+                "Manually Selected Points and RANSAC.png")
+
+    start_SIFT_stitch_palace_time = time.time()
+    print(f"Q1.7 - Starting panorama creation of Palace images using SIFT and "
+          f"RANSAC, with scale factor of {scale_percent}")
+    SIFT_stitch_palace = createBigPanorama(palace_images, mode='SIFT',
+                                           use_ransac=True)
+    end_SIFT_stitch_palace_time = time.time()
+    print(f"Q1.7 - Panorama creation of Palace images using SIFT and RANSAC "
+          f"with with scale factor of {scale_percent} took "
+          f"{end_SIFT_stitch_palace_time - start_SIFT_stitch_palace_time} "
+          f"seconds to complete")
+
+    fig4, axes4 = plt.subplots(1, 1)
+    axes4.imshow(SIFT_stitch_palace)
+    axes4.set_xticks([])
+    axes4.set_yticks([])
+    fig4.suptitle('Section 1.7 - Stitched Palace Images Using SIFT and RANSAC')
+    plt.savefig("./../output/Section 1.7 - Stitched Palace Images Using "
+                "SIFT and RANSAC.png")
 
 
 def Q1Eight():
@@ -678,37 +675,17 @@ def Q1Eight():
         cv2.cvtColor(cv2.imread('./my_data/taub_2.jpeg'), cv2.COLOR_BGR2RGB),
         cv2.cvtColor(cv2.imread('./my_data/taub_3.jpeg'), cv2.COLOR_BGR2RGB)]
 
-    scale_percent = 40  # percent of original size
+    scale_percent = 30  # percent of original size
     width = int(technion_images[0].shape[1] * scale_percent / 100)
     height = int(technion_images[0].shape[0] * scale_percent / 100)
     dim = (width, height)
 
     technion_images = [cv2.resize(img, dim) for img in technion_images]
 
-    # start_SIFT_stitch_technion_time = time.time()
-    # print(f"Q1.8 - Starting panorama creation of Technion images using SIFT "
-    #       f"and RANSAC, with scale factor of {scale_percent}")
-    # SIFT_stitch_technion = createBigPanorama(technion_images, mode='SIFT',
-    #                                          use_ransac=True)
-    # end_SIFT_stitch_technion_time = time.time()
-    # print(f"Q1.8 - Panorama creation of Technion images using SIFT and RANSAC "
-    #       f"with with scale factor of {scale_percent} took "
-    #       f"{end_SIFT_stitch_technion_time - start_SIFT_stitch_technion_time} "
-    #       f"seconds to complete")
-    #
-    # fig1, axes1 = plt.subplots(1, 1)
-    # axes1.imshow(SIFT_stitch_technion)
-    # axes1.set_xticks([])
-    # axes1.set_yticks([])
-    # fig1.suptitle('Section 1.8 - Stitched Technion Images Using SIFT and '
-    #               'RANSAC')
-    # plt.savefig("./../output/Section 1.8 - Stitched Technion Images Using "
-    #             "SIFT and RANSAC.png")
-
     start_Manual_stitch_technion_time = time.time()
     print(f"Q1.8 - Starting panorama creation of Technion images using Manual "
           f"Point Selection and RANSAC, with scale factor of {scale_percent}")
-    SIFT_stitch_technion = createBigPanorama(technion_images, mode='Manual',
+    Manual_stitch_technion = createBigPanorama(technion_images, mode='Manual',
                                              use_ransac=True)
     end_Manual_stitch_technion_time = time.time()
     print(f"Q1.8 - Panorama creation of Technion images using Manual Point "
@@ -717,7 +694,7 @@ def Q1Eight():
           f"seconds to complete")
 
     fig2, axes2 = plt.subplots(1, 1)
-    axes2.imshow(SIFT_stitch_technion)
+    axes2.imshow(Manual_stitch_technion)
     axes2.set_xticks([])
     axes2.set_yticks([])
     fig2.suptitle('Section 1.8 - Stitched Technion Images Using Manual Point '
@@ -735,12 +712,12 @@ if __name__ == '__main__':
     im2 = cv2.cvtColor(im2, cv2.COLOR_BGR2RGB)
 
     fig1, axes1 = plt.subplots(1, 2)  # Figure for Q1.2
-    # Q1Two()
-    # Q1Three()
-    # Q1Four()
-    # Q1Five()
-    # Q1Six()
+    Q1Two()
+    Q1Three()
+    Q1Four()
+    Q1Five()
+    Q1Six()
     Q1Seven()
-    # Q1Eight()
+    Q1Eight()
 
     print("end")
