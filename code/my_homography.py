@@ -465,8 +465,16 @@ def Q1Six():
     beach_images = [cv2.resize(img, dim) for img in beach_images]
     # beach_images = [cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) for img in
     #                 beach_images]
+    # start_Manual_stitch_beach_time = time.time()
+    # print(f"Q1.6 - Starting panorama creation of Beach images using Manual "
+    #       f"mode and no RANSAC, with scale factor of {scale_percent}")
     # manual_stitch_beach = createBigPanorama(beach_images, mode='MANUAL',
     #                                         use_ransac=False)
+    # end_Manual_stitch_beach_time = time.time()
+    # print(f"Q1.6 - Panorama creation of Beach images using Manual mode and "
+    #       f"no RANSAC with with scale factor of {scale_percent} took "
+    #       f"{end_Manual_stitch_beach_time - start_Manual_stitch_beach_time} "
+    #       f"seconds to complete")
     # manual_stitch_beach = cv2.rotate(manual_stitch_beach,
     #                                  cv2.ROTATE_90_COUNTERCLOCKWISE)
 
@@ -515,8 +523,15 @@ def Q1Six():
     # Resize the images due to time constraints
     palace_images = [cv2.resize(img, dim) for img in palace_images]
 
+    # start_Manual_stitch_palace_time = time.time()
+    # print(f"Q1.6 - Starting panorama creation of Palace images using Manual "
+    #       f"mode and no RANSAC, with scale factor of {scale_percent}")
     # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
     #                                          use_ransac=False)
+    # print(f"Q1.6 - Panorama creation of Palace images using Manual mode and "
+    #       f"no RANSAC with with scale factor of {scale_percent} took "
+    #       f"{end_Manual_stitch_palace_time - start_Manual_stitch_palace_time} "
+    #       f"seconds to complete")
 
     # fig3, axes3 = plt.subplots(1, 1)
     # axes3.imshow(manual_stitch_palace)
@@ -564,10 +579,18 @@ def Q1Seven():
     beach_images = [cv2.resize(img, dim) for img in beach_images]
     # beach_images = [cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE) for img in
     #                 beach_images]
+    # start_Manual_stitch_beach_time = time.time()
+    # print(f"Q1.7 - Starting panorama creation of Beach images using Manual "
+    #       f"mode and RANSAC, with scale factor of {scale_percent}")
     # manual_stitch_beach = createBigPanorama(beach_images, mode='MANUAL',
     #                                         use_ransac=True)
     # manual_stitch_beach = cv2.rotate(manual_stitch_beach,
     #                                  cv2.ROTATE_90_COUNTERCLOCKWISE)
+    # end_Manual_stitch_beach_time = time.time()
+    # print(f"Q1.7 - Panorama creation of Beach images using Manual mode and "
+    #       f"RANSAC with with scale factor of {scale_percent} took "
+    #       f"{end_Manual_stitch_beach_time - start_Manual_stitch_beach_time} "
+    #       f"seconds to complete")
     #
     # fig1, axes1 = plt.subplots(1, 1)
     # axes1.imshow(manual_stitch_beach)
@@ -614,9 +637,16 @@ def Q1Seven():
 
     # # Resize the images due to time constraints
     palace_images = [cv2.resize(img, dim) for img in palace_images]
-
+    # start_Manual_stitch_palace_time = time.time()
+    # print(f"Q1.7 - Starting panorama creation of Palace images using Manual "
+    #       f"mode and RANSAC, with scale factor of {scale_percent}")
     # manual_stitch_palace = createBigPanorama(palace_images, mode='MANUAL',
     #                                          use_ransac=True)
+    # end_Manual_stitch_palace_time = time.time()
+    # print(f"Q1.7 - Panorama creation of Palace images using Manual mode and "
+    #       f"RANSAC with with scale factor of {scale_percent} took "
+    #       f"{end_Manual_stitch_palace_time - start_Manual_stitch_palace_time} "
+    #       f"seconds to complete")
 
     # fig3, axes3 = plt.subplots(1, 1)
     # axes3.imshow(manual_stitch_palace)
