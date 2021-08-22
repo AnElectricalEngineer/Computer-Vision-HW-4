@@ -1,8 +1,6 @@
 # Homographies
 
-## About Homographies
-
-In this work, we use homographies to create panorama images from scratch (without using functions from OpenCV/Scipy/other), and to warp planar images into other images. 
+Homographies is a miniproject in Computer Vision which creates panorama images from scratch (without using functions from OpenCV/Scipy/other), and warps planar images into other images.
 
 ## Panorama Creation
 
